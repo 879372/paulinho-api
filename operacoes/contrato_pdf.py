@@ -1,89 +1,63 @@
-"""Contrato de locação de motocicleta — CC, arts. 565 a 578; CTB, art. 257, § 7º."""
-from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, Spacer
-
-from core.pdf_contrato import ESTILOS, Instrumento, LACUNA, data_br, moeda, qualificacao_cliente, qualificacao_empresa, t, valor_completo
+"""Contrato de locação de motocicleta — CC, arts. 565 a 578; CTB, art. 257, § 7º. Máximo de 2 páginas."""
+from core.pdf_contrato import LACUNA, Instrumento, data_br, gerar_pdf, moeda, qualificacao_cliente, qualificacao_empresa, resposta_pdf, t, valor_completo
+from core.api.contratos.instrumento import GERAIS, TITULO_EXECUTIVO
 from .models import Aluguel
 
-PERIODO = {'semanal': ('semanal', 'semana', 7), 'mensal': ('mensal', 'mês', 30)}
-ITENS_VISTORIA = ['Lataria / carenagens', 'Pintura', 'Tanque e banco', 'Pneu dianteiro', 'Pneu traseiro', 'Freios', 'Farol, lanternas e setas', 'Retrovisores',
-                  'Painel e velocímetro', 'Corrente / relação', 'Bateria e partida', 'Buzina', 'Documento (CRLV)', 'Chave(s) — quantidade', 'Capacete(s) — quantidade',
-                  'Quilometragem na entrega', 'Nível de combustível']
+PERIODO = {'semanal': ('semanal', 'semana', 'semanais'), 'mensal': ('mensal', 'mês', 'mensais')}
+ITENS_VISTORIA = ['Lataria e carenagens', 'Pintura e tanque', 'Banco', 'Pneu dianteiro', 'Pneu traseiro', 'Freios', 'Farol, lanternas e setas', 'Retrovisores', 'Painel',
+                  'Corrente / relação', 'Bateria e partida', 'Documento (CRLV)', 'Chaves (qtd.)', 'Capacete (qtd.)', 'Quilometragem', 'Combustível']
 
 
-def contrato_locacao_pdf(aluguel: Aluguel):
+def montar_locacao(aluguel: Aluguel, nivel=0):
     moto, cliente = aluguel.moto, aluguel.cliente
-    periodo, unidade, dias = PERIODO.get(aluguel.periodicidade, PERIODO['mensal'])
-    cobrancas = list(aluguel.cobrancas.order_by('vencimento'))
+    periodo, unidade, plural = PERIODO.get(aluguel.periodicidade, PERIODO['mensal'])
     numero = f'{aluguel.pk:05d}'
+    tolerancia = 7 if aluguel.periodicidade == 'semanal' else 10
 
-    doc = Instrumento('CONTRATO DE LOCAÇÃO DE MOTOCICLETA', f'Contrato nº {numero} · Placa {t(moto.placa)}', f'Contrato de locação de motocicleta nº {numero}')
-    doc.partes(
-        qualificacao_empresa('LOCADOR'),
-        qualificacao_cliente(cliente, 'LOCATÁRIO', f', habilitado(a) na categoria "A", CNH nº {LACUNA}, válida até {LACUNA}'),
-        preambulo='As partes acima identificadas têm, entre si, justo e contratado o presente Contrato de Locação de Motocicleta, que se regerá pelos artigos 565 a 578 do Código Civil e pelas cláusulas e condições seguintes.',
-    )
+    doc = Instrumento('CONTRATO DE LOCAÇÃO DE MOTOCICLETA', f'Contrato nº {numero} · Placa {t(moto.placa)}', f'Contrato de locação de motocicleta nº {numero}', nivel)
+    doc.partes(qualificacao_empresa('LOCADOR'), qualificacao_cliente(cliente, 'LOCATÁRIO', f', CNH categoria "A" nº {LACUNA}'),
+               preambulo='As partes têm entre si justo e contratado esta Locação de Motocicleta, regida pelos arts. 565 a 578 do Código Civil e pelas cláusulas seguintes.')
 
-    doc.clausula('Do objeto',
-        f'O LOCADOR dá em locação ao LOCATÁRIO a motocicleta modelo <b>{t(moto.modelo)}</b>, placa <b>{t(moto.placa)}</b>, '
-        f'RENAVAM {LACUNA}, chassi {LACUNA}, ano/modelo {LACUNA}, cor {LACUNA}, de sua propriedade ou posse legítima.',
-        'A motocicleta é entregue em perfeitas condições de uso, conservação e funcionamento, com documentação regular, conforme Termo de Vistoria (Anexo II), que integra este contrato e será assinado pelas partes na entrega e na devolução.')
-    doc.clausula('Do prazo',
-        f'A locação vigorará de <b>{data_br(aluguel.inicio)}</b> a <b>{data_br(aluguel.fim)}</b>, data em que o LOCATÁRIO deverá restituir a motocicleta, independentemente de notificação.',
-        'A prorrogação dependerá de novo instrumento ou aditivo escrito. Permanecendo o LOCATÁRIO na posse do veículo após o término sem oposição do LOCADOR, a locação seguirá pelo mesmo aluguel, por prazo indeterminado (Código Civil, art. 574).')
-    doc.clausula('Do aluguel e da forma de pagamento',
-        f'O LOCATÁRIO pagará ao LOCADOR aluguel {periodo} de {valor_completo(aluguel.valor)}, vencendo-se o primeiro em <b>{data_br(aluguel.primeiro_vencimento)}</b> '
-        f'e os demais no mesmo dia de cada {unidade} subsequente, conforme o cronograma do Anexo I.',
-        'Os pagamentos serão realizados por PIX, transferência bancária ou em espécie, mediante recibo, que servirá como prova de quitação.',
-        'O aluguel remunera exclusivamente o uso da motocicleta. Combustível, pedágios, estacionamentos e demais despesas de uso correm por conta do LOCATÁRIO.')
-    doc.clausula('Da garantia',
-        f'Como garantia das obrigações deste contrato, o LOCATÁRIO entrega ao LOCADOR caução de R$ {LACUNA} ( ) não se aplica, que será restituída em até 10 (dez) dias após a devolução da motocicleta, '
-        'deduzidos eventuais aluguéis em aberto, multas de trânsito, franquias e reparos de danos de responsabilidade do LOCATÁRIO.')
-    doc.clausula('Do atraso no pagamento',
-        'O atraso no pagamento do aluguel sujeitará o LOCATÁRIO a multa moratória de 2% (dois por cento) e juros de mora de 1% (um por cento) ao mês, calculados pro rata die.',
-        f'O atraso superior a {7 if aluguel.periodicidade == "semanal" else 10} dias autoriza o LOCADOR a considerar rescindido este contrato, devendo o LOCATÁRIO restituir imediatamente a motocicleta, '
-        'sem prejuízo da cobrança dos valores devidos e das medidas judiciais cabíveis.')
-    doc.clausula('Do uso da motocicleta',
-        'O LOCATÁRIO se obriga a utilizar a motocicleta com zelo, como se sua fosse (Código Civil, art. 569, I), exclusivamente para fins lícitos e dentro do território nacional, sendo-lhe vedado:',
-        'O LOCATÁRIO declara possuir Carteira Nacional de Habilitação válida na categoria "A" e compromete-se a utilizar capacete e demais equipamentos obrigatórios.',
-        incisos=['sublocar, ceder, emprestar ou permitir a condução da motocicleta por terceiros sem autorização escrita do LOCADOR;',
-                 'utilizá-la em competições, testes, transporte de cargas acima da capacidade ou em desacordo com as normas de trânsito;',
-                 'realizar modificações mecânicas, elétricas ou estéticas, ou remover, desligar ou danificar rastreador ou bloqueador eventualmente instalado;',
-                 'dar a motocicleta em garantia ou praticar qualquer ato que comprometa a posse e a propriedade do LOCADOR.'])
-    doc.clausula('Da manutenção',
-        'A manutenção preventiva decorrente do desgaste natural (troca de óleo, revisões periódicas, pneus e relação por desgaste) é de responsabilidade do LOCADOR, cabendo ao LOCATÁRIO comunicar a necessidade com antecedência e apresentar a motocicleta nas datas agendadas.',
-        'Os reparos decorrentes de mau uso, negligência, acidente causado pelo LOCATÁRIO ou falta de comunicação de defeitos serão custeados pelo LOCATÁRIO.')
-    doc.clausula('Das multas e infrações de trânsito',
-        'São de responsabilidade do LOCATÁRIO as multas, pontuações e demais penalidades decorrentes de infrações cometidas durante o período da locação, desde a entrega até a efetiva devolução da motocicleta.',
-        'O LOCADOR indicará o LOCATÁRIO como condutor responsável perante o órgão de trânsito, nos termos do art. 257, § 7º, do Código de Trânsito Brasileiro, obrigando-se o LOCATÁRIO a assinar os formulários necessários.',
-        'Havendo pagamento de multa pelo LOCADOR, o LOCATÁRIO deverá reembolsá-lo em até 5 (cinco) dias após a comunicação, acompanhada do respectivo comprovante.')
-    doc.clausula('Dos sinistros, furto e roubo',
-        'Em caso de acidente, furto, roubo ou qualquer dano, o LOCATÁRIO deverá comunicar o LOCADOR imediatamente, em no máximo 24 (vinte e quatro) horas, e registrar boletim de ocorrência.',
-        'O LOCATÁRIO responde pelos danos causados à motocicleta e a terceiros durante a locação quando agir com culpa ou dolo, inclusive pela franquia de seguro e pela parcela do prejuízo não coberta.')
-    doc.clausula('Da devolução',
-        'Ao término ou rescisão da locação, a motocicleta deverá ser devolvida no endereço do LOCADOR, no estado em que foi recebida, ressalvado o desgaste natural do uso, com o mesmo nível de combustível, mediante nova vistoria.',
-        'O atraso na devolução sujeitará o LOCATÁRIO ao pagamento do aluguel proporcional aos dias de atraso, sem prejuízo das perdas e danos e das medidas para reaver o bem (Código Civil, art. 575).')
-    doc.clausula('Da rescisão',
-        'O contrato poderá ser rescindido por qualquer das partes, mediante aviso prévio por escrito de 7 (sete) dias, ficando o LOCATÁRIO obrigado ao pagamento dos aluguéis proporcionais ao período de uso.',
-        'O descumprimento de qualquer cláusula autoriza a rescisão imediata pela parte prejudicada, com a devolução imediata da motocicleta.')
+    doc.clausula('Do objeto e do prazo',
+        f'O LOCADOR loca ao LOCATÁRIO a motocicleta <b>{t(moto.modelo)}</b>, placa <b>{t(moto.placa)}</b>, RENAVAM {LACUNA}, ano/cor {LACUNA}, '
+        f'de <b>{data_br(aluguel.inicio)}</b> a <b>{data_br(aluguel.fim)}</b>, entregue em perfeito estado conforme a vistoria abaixo.',
+        'A prorrogação depende de aditivo escrito; permanecendo o LOCATÁRIO com a moto após o término sem oposição, a locação segue pelo mesmo aluguel por prazo indeterminado (CC, art. 574).')
+    doc.clausula('Do aluguel e da garantia',
+        f'O aluguel {periodo} é de {valor_completo(aluguel.valor)}, com primeiro vencimento em <b>{data_br(aluguel.primeiro_vencimento)}</b> e os demais a cada {unidade}, '
+        'pago por PIX, transferência ou em espécie, valendo o comprovante como quitação. Combustível, pedágios e estacionamentos correm por conta do LOCATÁRIO.',
+        f'Caução: R$ {LACUNA} ( ) não se aplica, restituída em até 10 (dez) dias após a devolução, deduzidos débitos, multas, franquias e reparos de responsabilidade do LOCATÁRIO.')
+    doc.clausula('Do atraso',
+        f'O atraso sujeita o LOCATÁRIO a multa de 2% (dois por cento) e juros de 1% (um por cento) ao mês pro rata die. Atraso superior a {tolerancia} dias autoriza a rescisão, '
+        'devendo a moto ser devolvida imediatamente, sem prejuízo da cobrança e das medidas judiciais cabíveis.')
+    doc.clausula('Do uso',
+        'O LOCATÁRIO, habilitado na categoria "A", usará a moto com zelo (CC, art. 569), para fins lícitos, com capacete e equipamentos obrigatórios, sendo-lhe vedado:',
+        incisos=['sublocar, ceder ou emprestar a moto, ou permitir que terceiros a conduzam;',
+                 'usá-la em competições ou em desacordo com as normas de trânsito;',
+                 'modificá-la ou remover/desligar rastreador ou bloqueador instalado.'])
+    doc.clausula('Da manutenção, multas e sinistros',
+        'A manutenção por desgaste natural (óleo, revisões, pneus e relação) cabe ao LOCADOR, devendo o LOCATÁRIO comunicar a necessidade e apresentar a moto; reparos por mau uso ou culpa cabem ao LOCATÁRIO.',
+        'Multas e pontuações do período da locação são do LOCATÁRIO, que será indicado como condutor (CTB, art. 257, § 7º) e reembolsará multas pagas pelo LOCADOR em até 5 (cinco) dias.',
+        'Acidente, furto ou roubo devem ser comunicados em até 24 horas, com boletim de ocorrência; o LOCATÁRIO responde pelos danos causados por culpa ou dolo, inclusive franquia de seguro.')
+    doc.clausula('Da devolução e da rescisão',
+        'A moto será devolvida no endereço do LOCADOR no estado em que foi recebida, salvo desgaste natural; o atraso na devolução gera aluguel proporcional por dia, além de perdas e danos (CC, art. 575).',
+        'Qualquer parte pode rescindir com aviso escrito de 7 (sete) dias; o descumprimento de cláusula autoriza a rescisão imediata.')
     doc.clausula('Das disposições gerais',
-        'A tolerância de qualquer das partes quanto ao descumprimento de obrigações não implicará novação, renúncia ou alteração do pactuado.',
-        'Este instrumento, assinado pelas partes e por 2 (duas) testemunhas, constitui título executivo extrajudicial, nos termos do art. 784, III, do Código de Processo Civil.',
-        'As partes autorizam comunicações, lembretes de vencimento e avisos pelo telefone/WhatsApp informado. Os dados pessoais serão tratados exclusivamente para execução deste contrato, nos termos da Lei nº 13.709/2018 (LGPD).')
+        GERAIS + TITULO_EXECUTIVO,
+        'As partes autorizam comunicações e avisos pelo telefone/WhatsApp informado. Os dados pessoais serão tratados apenas para execução deste contrato (Lei nº 13.709/2018).')
     if aluguel.observacoes:
         doc.clausula('Das condições especiais', t(aluguel.observacoes))
-    doc.clausula('Do foro',
-        'Fica eleito o foro da comarca do domicílio do LOCATÁRIO para dirimir quaisquer controvérsias oriundas deste contrato, com renúncia a qualquer outro, por mais privilegiado que seja.')
-
+    doc.clausula('Do foro', 'Fica eleito o foro da comarca do domicílio do LOCATÁRIO, com renúncia a qualquer outro.')
     doc.assinaturas(aluguel.inicio, 'LOCADOR', 'LOCATÁRIO', cliente.nome)
 
-    linhas = [[str(i + 1), data_br(c.vencimento), moeda(c.valor), f'Pago em {data_br(c.pago_em)}' if c.pago_em else '', ''] for i, c in enumerate(cobrancas)]
-    doc.anexo('ANEXO I – CRONOGRAMA DE ALUGUÉIS', ['Nº', 'Vencimento', 'Valor', 'Situação', 'Visto'], linhas, [1.4 * cm, 3.6 * cm, 3.6 * cm, 4.6 * cm, 3.8 * cm],
-              f'Aluguel {periodo} de {moeda(aluguel.valor)} · período de {data_br(aluguel.inicio)} a {data_br(aluguel.fim)}.')
-    vistoria = [[item, '', '', ''] for item in ITENS_VISTORIA]
-    doc.anexo('ANEXO II – TERMO DE VISTORIA', ['Item', 'Entrega', 'Devolução', 'Observações'], vistoria, [5.4 * cm, 2.6 * cm, 2.6 * cm, 6.4 * cm],
-              f'Motocicleta {t(moto.modelo)}, placa {t(moto.placa)}. Marque OK ou descreva avarias. Data da entrega: {data_br(aluguel.inicio)} · Data da devolução: {LACUNA}')
-    doc.story.append(Spacer(1, 26))
-    doc.story.append(Paragraph('_' * 34 + '&nbsp;' * 10 + '_' * 34, ESTILOS['centro']))
-    doc.story.append(Paragraph('LOCADOR' + '&nbsp;' * 62 + 'LOCATÁRIO', ESTILOS['pequeno']))
-    return doc.resposta(f'contrato-locacao-{moto.placa}-{aluguel.pk}.pdf')
+    itens = [(c.vencimento, c.valor) for c in aluguel.cobrancas.order_by('vencimento')]
+    doc.cronograma('ANEXO I – CRONOGRAMA DE ALUGUÉIS', itens, f'{len(itens)} aluguéis {plural} de {moeda(aluguel.valor)}, de {data_br(aluguel.inicio)} a {data_br(aluguel.fim)}.')
+    doc.checklist('ANEXO II – VISTORIA', ITENS_VISTORIA, 'Marque OK ou anote a avaria na entrega e na devolução.')
+    return doc
+
+
+def contrato_locacao_bytes(aluguel):
+    return gerar_pdf(lambda nivel: montar_locacao(aluguel, nivel))
+
+
+def contrato_locacao_pdf(aluguel):
+    return resposta_pdf(contrato_locacao_bytes(aluguel), f'contrato-locacao-{aluguel.moto.placa}-{aluguel.pk}.pdf')

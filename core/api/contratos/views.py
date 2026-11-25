@@ -6,7 +6,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from core.models import Contrato, MensagemEnviada, Parcela
 from core.api.parcelas.serializers import ParcelaSerializer
-from .instrumento import contrato_mutuo_pdf
+from core.assinatura import view_assinatura, view_pdf_assinado
+from .instrumento import contrato_mutuo_bytes, contrato_mutuo_pdf
 from .pdf import comprovante_pdf
 from .serializers import ContratoCreateSerializer, ContratoDetailSerializer, ContratoJurosUpdateSerializer, ContratoUpdateSerializer, QuitacaoPrincipalSerializer
 from .services import adicionar_periodo, proximo_vencimento_recorrente
@@ -93,6 +94,19 @@ def instrumento(request, pk):
     if contrato.tipo == Contrato.Tipo.VENDA:
         return Response({'detail': 'O contrato de mútuo está disponível apenas para empréstimos.'}, status=status.HTTP_400_BAD_REQUEST)
     return contrato_mutuo_pdf(contrato)
+
+
+@api_view(['GET', 'POST'])
+def assinatura(request, pk):
+    contrato = get_object_or_404(Contrato.objects.select_related('cliente').prefetch_related('parcelas'), pk=pk)
+    if contrato.tipo == Contrato.Tipo.VENDA:
+        return Response({'detail': 'A assinatura eletrônica está disponível apenas para empréstimos.'}, status=status.HTTP_400_BAD_REQUEST)
+    return view_assinatura(request, contrato, lambda: contrato_mutuo_bytes(contrato), f'Contrato de mútuo nº {contrato.pk:05d} – {contrato.cliente.nome}', f'contrato-mutuo-{contrato.pk}.pdf', contrato.cliente)
+
+
+@api_view(['GET'])
+def assinatura_pdf(request, pk):
+    return view_pdf_assinado(get_object_or_404(Contrato, pk=pk), f'contrato-mutuo-{pk}-assinado.pdf')
 
 
 @api_view(['PATCH'])

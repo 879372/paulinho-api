@@ -2,6 +2,21 @@ from decimal import Decimal
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+class AssinaturaDigital(models.Model):
+    """Estado da assinatura eletrônica (Autentique) do instrumento contratual."""
+    class StatusAssinatura(models.TextChoices):
+        NAO_ENVIADO = '', 'Não enviado'; PENDENTE = 'pendente', 'Aguardando assinatura'; ASSINADO = 'assinado', 'Assinado'; RECUSADO = 'recusado', 'Recusado'
+    assinatura_id = models.CharField(max_length=80, blank=True)
+    assinatura_status = models.CharField(max_length=12, choices=StatusAssinatura.choices, blank=True, default='')
+    assinatura_enviada_em = models.DateTimeField(null=True, blank=True)
+    assinatura_concluida_em = models.DateTimeField(null=True, blank=True)
+    assinatura_link_empresa = models.URLField(blank=True)
+    assinatura_sandbox = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+
+
 class Cliente(models.Model):
     nome = models.CharField(max_length=160)
     telefone = models.CharField(max_length=20)
@@ -11,7 +26,7 @@ class Cliente(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
     def __str__(self): return self.nome
 
-class Contrato(models.Model):
+class Contrato(AssinaturaDigital):
     class Origem(models.TextChoices):
         NOVO='novo','Novo'; IMPORTADO='importado','Importado em andamento'
     class Tipo(models.TextChoices):

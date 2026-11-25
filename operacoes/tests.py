@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 from core.models import Cliente, Contrato, Parcela
-from .models import Moto, Movimento, CobrancaAluguel
+from .models import Aluguel, Moto, Movimento, CobrancaAluguel
 
 
 class OperacoesTests(TestCase):
@@ -122,3 +122,172 @@ class ContratosPdfTests(TestCase):
         self.assertEqual(extenso_reais('1234.56'), 'mil duzentos e trinta e quatro reais e cinquenta e seis centavos')
         self.assertEqual(extenso_reais('2000000'), 'dois milhões de reais')
         self.assertEqual(extenso_reais('1100'), 'mil e cem reais')
+
+
+from unittest import mock
+import json as _json
+import re as _re
+from django.test import override_settings
+
+
+class _Resposta:
+    def __init__(self, dados, status_code=200):
+        self.status_code, self._dados, self.ok = status_code, dados, status_code < 400
+
+    def json(self):
+        return self._dados
+
+
+class AssinaturaAutentiqueTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(get_user_model().objects.create_user('gestor-assinatura'))
+        self.cliente = Cliente.objects.create(nome='Cliente Assina', telefone='85988887777')
+        hoje = date.today()
+        self.contrato = Contrato.objects.create(cliente=self.cliente, tipo='emprestimo_tradicional', data_inicio=hoje, valor_principal=Decimal('1000'), taxa_juros_mensal=Decimal('5'), qtd_parcelas=2, valor_parcela=Decimal('550'))
+        Parcela.objects.create(contrato=self.contrato, numero=1, valor=Decimal('550'), data_vencimento=hoje)
+        self.url = f'/api/contratos/{self.contrato.pk}/assinatura/'
+
+    @override_settings(AUTENTIQUE_TOKEN='')
+    def test_sem_token_informa_configuracao(self):
+        resposta = self.client.post(self.url)
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn('AUTENTIQUE_TOKEN', resposta.data['detail'])
+        self.assertFalse(self.client.get(self.url).data['configurado'])
+
+    @override_settings(AUTENTIQUE_TOKEN='token-teste', AUTENTIQUE_SANDBOX=True, AUTENTIQUE_EMAIL_EMPRESA='')
+    def test_envia_por_whatsapp_e_atualiza_status(self):
+        criado = {'data': {'createDocument': {'id': 'doc-1', 'signatures': [
+            {'name': 'Cliente Assina', 'email': None, 'action': {'name': 'SIGN'}, 'link': None},
+            {'name': 'Gestão de Operações', 'email': None, 'action': {'name': 'SIGN'}, 'link': {'short_link': 'https://assina.ae/empresa'}}]}}}
+        with mock.patch('core.assinatura.requests.post', return_value=_Resposta(criado)) as post:
+            resposta = self.client.post(self.url)
+        self.assertEqual(resposta.status_code, 201, resposta.data)
+        operacoes = _json.loads(post.call_args.kwargs['data']['operations'])
+        self.assertIn('sandbox: true', operacoes['query'])
+        cliente = operacoes['variables']['signers'][0]
+        self.assertEqual((cliente['phone'], cliente['delivery_method']), ('+5585988887777', 'DELIVERY_METHOD_WHATSAPP'))
+        pdf = post.call_args.kwargs['files']['file'][1]
+        self.assertTrue(pdf.startswith(b'%PDF'))
+        self.assertLessEqual(len(_re.findall(rb'/Type /Page[^s]', pdf)), 2)
+        self.contrato.refresh_from_db()
+        self.assertEqual((self.contrato.assinatura_status, self.contrato.assinatura_link_empresa), ('pendente', 'https://assina.ae/empresa'))
+        self.assertEqual(self.client.post(self.url).status_code, 400)  # não reenvia sem pedido explícito
+
+        assinado = {'data': {'document': {'id': 'doc-1', 'files': {'signed': 'https://x/assinado.pdf'}, 'signatures': [
+            {'name': 'Cliente Assina', 'action': {'name': 'SIGN'}, 'signed': {'created_at': '2026-11-25'}, 'rejected': None},
+            {'name': 'Gestão de Operações', 'action': {'name': 'SIGN'}, 'signed': {'created_at': '2026-11-25'}, 'rejected': None}]}}}
+        with mock.patch('core.assinatura.requests.post', return_value=_Resposta(assinado)):
+            resposta = self.client.get(self.url)
+        self.assertEqual(resposta.data['assinatura_status'], 'assinado')
+        self.assertTrue(all(s['assinou'] for s in resposta.data['signatarios']))
+
+    @override_settings(AUTENTIQUE_TOKEN='token-teste')
+    def test_erro_da_api_vira_mensagem(self):
+        with mock.patch('core.assinatura.requests.post', return_value=_Resposta({'errors': [{'message': 'quota exceeded'}]})):
+            resposta = self.client.post(self.url)
+        self.assertEqual(resposta.status_code, 502)
+        self.assertIn('quota exceeded', resposta.data['detail'])
+
+    def test_locacao_longa_cabe_em_duas_paginas(self):
+        from operacoes.contrato_pdf import contrato_locacao_bytes
+        moto = Moto.objects.create(placa='XYZ1A23', modelo='CG 160')
+        aluguel = Aluguel.objects.create(moto=moto, cliente=self.cliente, inicio=date.today(), fim=date.today() + timedelta(days=364), valor=Decimal('250'), periodicidade='semanal', primeiro_vencimento=date.today())
+        for i in range(52):
+            CobrancaAluguel.objects.create(aluguel=aluguel, vencimento=date.today() + timedelta(days=7 * i), valor=Decimal('250'))
+        self.assertLessEqual(len(_re.findall(rb'/Type /Page[^s]', contrato_locacao_bytes(aluguel))), 2)
+
+
+class DisponibilidadeMotoTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(get_user_model().objects.create_user('frota-teste'))
+        self.cliente = Cliente.objects.create(nome='Cliente', telefone='85988887777')
+        self.moto = Moto.objects.create(placa='ABC1D23', modelo='CG 160')
+
+    def test_disponibilidade_acompanha_periodo_e_preserva_manutencao(self):
+        from unittest.mock import patch
+        inicio = date(2026, 11, 25)
+        fim = inicio + timedelta(days=7)
+        Aluguel.objects.create(moto=self.moto, cliente=self.cliente, inicio=inicio, fim=fim, primeiro_vencimento=inicio, periodicidade='semanal', valor='100')
+        for dia, esperado in [(inicio-timedelta(days=1), 'disponivel'), (inicio, 'alugada'), (fim, 'alugada'), (fim+timedelta(days=1), 'disponivel')]:
+            with self.subTest(dia=dia), patch('operacoes.views.timezone.localdate', return_value=dia):
+                response = self.client.get('/api/operacoes/motos/')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['results'][0]['disponibilidade'], esperado)
+        self.moto.em_manutencao = True
+        self.moto.save(update_fields=['em_manutencao'])
+        with patch('operacoes.views.timezone.localdate', return_value=inicio):
+            self.assertEqual(self.client.get('/api/operacoes/motos/').data['results'][0]['disponibilidade'], 'manutencao')
+
+
+class CobrancasAluguelTests(TestCase):
+    setUp = OperacoesTests.setUp
+    aluguel = OperacoesTests.aluguel
+    post = OperacoesTests.post
+    def test_lista_filtra_busca_status_e_registra_recebimento(self):
+        from unittest.mock import patch
+        aluguel = self.aluguel()
+        self.assertEqual(aluguel.status_code, 201)
+        url = '/api/operacoes/alugueis/cobrancas/'
+        with patch('operacoes.views.timezone.localdate', return_value=self.hoje), patch('operacoes.serializers.timezone.localdate', return_value=self.hoje):
+            pendentes = self.client.get(url, {'status': 'pendente', 'busca': self.moto.placa})
+            self.assertEqual(pendentes.data['count'], 3)
+            item = pendentes.data['results'][0]
+            self.assertEqual(item['status'], 'pendente')
+            self.assertEqual(item['valor'], '100.00')
+            self.assertEqual(self.client.get(url, {'busca': 'inexistente'}).data['count'], 0)
+            self.assertEqual(self.client.get(url, {'status': 'paga'}).data['count'], 0)
+            resposta = self.post(f"alugueis/cobrancas/{item['id']}/receber/", {'data': str(self.hoje)})
+            self.assertEqual(resposta.status_code, 200)
+            self.assertEqual(self.client.get(url, {'status': 'paga'}).data['count'], 1)
+            self.assertEqual(Movimento.objects.filter(cobranca_id=item['id']).count(), 1)
+        with patch('operacoes.views.timezone.localdate', return_value=self.hoje + timedelta(days=8)), patch('operacoes.serializers.timezone.localdate', return_value=self.hoje + timedelta(days=8)):
+            atrasadas = self.client.get(url, {'status': 'atrasada'})
+            self.assertEqual(atrasadas.data['count'], 1)
+            self.assertEqual(atrasadas.data['results'][0]['status'], 'atrasada')
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(url).status_code, 401)
+
+    def test_baixar_contrato_nao_envia_para_autentique(self):
+        from unittest.mock import patch
+        aluguel = self.aluguel()
+        with patch('core.assinatura.requests.post') as enviar:
+            pdf = self.client.get(f"/api/operacoes/alugueis/{aluguel.data['id']}/contrato/")
+            self.assertEqual(pdf.status_code, 200)
+            self.assertEqual(pdf['Content-Type'], 'application/pdf')
+            self.assertIn('attachment', pdf['Content-Disposition'])
+            enviar.assert_not_called()
+        objeto = Aluguel.objects.get(pk=aluguel.data['id'])
+        self.assertFalse(objeto.assinatura_id)
+
+
+class CategoriasFinanceirasTests(TestCase):
+    setUp = OperacoesTests.setUp
+    post = OperacoesTests.post
+    aluguel = OperacoesTests.aluguel
+
+    def test_categoria_manual_e_automatica_conferem_com_caixa(self):
+        for categoria, tipo, valor in [('emprestimos', 'entrada', '25'), ('motos', 'saida', '20'), ('animais', 'entrada', '50'), ('outros', 'saida', '5')]:
+            resposta = self.post('movimentos/', {'descricao': categoria, 'categoria': categoria, 'tipo': tipo, 'valor': valor, 'data': str(self.hoje)})
+            self.assertEqual(resposta.status_code, 201, resposta.data)
+        cobranca = self.aluguel().data['cobrancas'][0]['id']
+        self.assertEqual(self.post(f'alugueis/cobrancas/{cobranca}/receber/', {'data': str(self.hoje)}).status_code, 200)
+        contrato = Contrato.objects.create(cliente=self.cliente, tipo='emprestimo_tradicional', origem='novo', data_inicio=self.hoje, valor_principal='200')
+        Parcela.objects.create(contrato=contrato, numero=1, valor='40', valor_pago='40', data_vencimento=self.hoje, data_pagamento=self.hoje, status='paga')
+        resumo = self.client.get('/api/operacoes/financeiro/').data
+        grupos = {item['categoria']: item for item in resumo['categorias']}
+        self.assertEqual(grupos['emprestimos']['entradas'], Decimal('65'))
+        self.assertEqual(grupos['emprestimos']['saidas'], Decimal('200'))
+        self.assertEqual(grupos['motos']['entradas'], Decimal('100'))
+        self.assertEqual(grupos['motos']['saidas'], Decimal('20'))
+        self.assertEqual(grupos['animais']['entradas'], Decimal('50'))
+        self.assertEqual(resumo['entradas'], sum(item['entradas'] for item in grupos.values()))
+        self.assertEqual(resumo['saldo_periodo'], sum(item['saldo'] for item in grupos.values()))
+        self.assertEqual(len(resumo['lancamentos']), 7)
+        ids = [item['id'] for item in resumo['lancamentos']]
+        self.assertEqual(len(ids), len(set(ids)))
+        fora = self.client.get('/api/operacoes/financeiro/', {'inicio': str(self.hoje-timedelta(days=2)), 'fim': str(self.hoje-timedelta(days=1))}).data
+        self.assertEqual(fora['entradas'], 0)
+        self.assertEqual(fora['saidas'], 0)
+        self.assertEqual(fora['lancamentos'], [])

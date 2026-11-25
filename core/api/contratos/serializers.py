@@ -136,7 +136,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Contrato
-        fields = ['id', 'cliente', 'cliente_nome', 'origem', 'tipo', 'status', 'data_inicio', 'produto', 'valor_produto', 'valor_venda', 'teve_entrada', 'valor_entrada', 'valor_principal', 'taxa_juros_mensal', 'qtd_parcelas', 'valor_parcela', 'periodicidade', 'data_primeira_parcela', 'valor_juros_mensal', 'dia_vencimento', 'dia_semana', 'data_quitacao_principal', 'observacoes', 'criado_em', 'parcelas']
+        fields = ['id', 'cliente', 'cliente_nome', 'origem', 'tipo', 'status', 'data_inicio', 'produto', 'valor_produto', 'valor_venda', 'teve_entrada', 'valor_entrada', 'valor_principal', 'taxa_juros_mensal', 'qtd_parcelas', 'valor_parcela', 'periodicidade', 'data_primeira_parcela', 'valor_juros_mensal', 'dia_vencimento', 'dia_semana', 'data_quitacao_principal', 'observacoes', 'criado_em', 'parcelas', 'assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox']
         read_only_fields = fields
 
 

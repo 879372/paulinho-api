@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django.core.validators import MinValueValidator
 from django.db import models
-from core.models import Cliente
+from core.models import AssinaturaDigital, Cliente
 
 
 class Moto(models.Model):
@@ -14,7 +14,7 @@ class Moto(models.Model):
         return f'{self.placa} · {self.modelo}'
 
 
-class Aluguel(models.Model):
+class Aluguel(AssinaturaDigital):
     moto = models.ForeignKey(Moto, on_delete=models.PROTECT, related_name='alugueis')
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT)
     inicio = models.DateField()
@@ -54,7 +54,8 @@ class Movimento(models.Model):
     categoria = models.CharField(max_length=32, choices=[
         ('alimentacao', 'Alimentação'), ('medicamentos', 'Medicamentos'),
         ('veterinario', 'Veterinário'), ('manejo', 'Manejo'), ('compra_animais', 'Compra de animais'),
-        ('venda_animais', 'Venda de animais'), ('manutencao', 'Manutenção'),
+        ('venda_animais', 'Venda de animais'), ('emprestimos', 'Empréstimos'),
+        ('motos', 'Aluguel de motos'), ('animais', 'Criação de animais'), ('manutencao', 'Manutenção'),
         ('multa', 'Multa'), ('aluguel', 'Aluguel recebido'), ('outros', 'Outros'),
     ])
     tipo = models.CharField(max_length=7, choices=Tipo.choices)

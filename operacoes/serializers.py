@@ -1,11 +1,23 @@
 from datetime import date
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from core.api.contratos.services import adicionar_periodo
 from .models import Moto, Aluguel, CobrancaAluguel, LoteAnimal, Movimento
 
 
 class MotoSerializer(serializers.ModelSerializer):
+    disponibilidade = serializers.SerializerMethodField()
+
+    def get_disponibilidade(self, obj):
+        if obj.em_manutencao:
+            return 'manutencao'
+        alugada = getattr(obj, 'aluguel_vigente', None)
+        if alugada is None:
+            hoje = timezone.localdate()
+            alugada = obj.alugueis.filter(inicio__lte=hoje, fim__gte=hoje).exists()
+        return 'alugada' if alugada else 'disponivel'
+
     class Meta:
         model = Moto
         fields = '__all__'
@@ -21,13 +33,20 @@ class MotoSerializer(serializers.ModelSerializer):
 
 
 class CobrancaSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
     cliente_nome = serializers.CharField(source='aluguel.cliente.nome', read_only=True)
     placa = serializers.CharField(source='aluguel.moto.placa', read_only=True)
 
     class Meta:
         model = CobrancaAluguel
-        fields = ['id', 'aluguel', 'vencimento', 'valor', 'pago_em', 'cliente_nome', 'placa']
+        fields = ['id', 'aluguel', 'vencimento', 'valor', 'pago_em', 'cliente_nome', 'placa', 'status']
         read_only_fields = fields
+
+
+    def get_status(self, obj):
+        if obj.pago_em:
+            return 'paga'
+        return 'atrasada' if obj.vencimento < timezone.localdate() else 'pendente'
 
 
 class AluguelSerializer(serializers.ModelSerializer):
@@ -37,7 +56,8 @@ class AluguelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Aluguel
-        fields = '__all__'
+        exclude = ['assinatura_id']
+        read_only_fields = ['assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox']
 
     def validate(self, attrs):
         if attrs['fim'] < attrs['inicio']:

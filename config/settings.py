@@ -95,6 +95,12 @@ COMPANY_IE = os.getenv('COMPANY_IE', '')
 COMPANY_ADDRESS = os.getenv('COMPANY_ADDRESS', '')
 COMPANY_PHONE = os.getenv('COMPANY_PHONE', '')
 COMPANY_LOGO_PATH = os.getenv('COMPANY_LOGO_PATH', '')
+
+# Assinatura eletrônica (Autentique). Token em https://painel.autentique.com.br/perfil/api
+AUTENTIQUE_TOKEN = os.getenv('AUTENTIQUE_TOKEN', '')
+AUTENTIQUE_SANDBOX = os.getenv('AUTENTIQUE_SANDBOX', 'true').lower() == 'true'
+# E-mail da empresa para receber o pedido de assinatura; vazio = link de assinatura exibido no app.
+AUTENTIQUE_EMAIL_EMPRESA = os.getenv('AUTENTIQUE_EMAIL_EMPRESA', '')
 SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'false').lower() == 'true'
 SECURE_REDIRECT_EXEMPT = [r'^api/health/$']
 if not DEBUG:
