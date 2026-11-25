@@ -41,4 +41,4 @@ Para backup no S3, programe `python manage.py backup_database` no cron e configu
 
 ## Publicação deste projeto
 
-Railway usa a branch `main` de `879372/paulinho-api`. O Dockerfile executa `start.sh`, que aplica as migrações do banco próprio, cria o administrador inicial se solicitado e inicia Gunicorn na porta `$PORT` com IPv4/IPv6. Configure `DATABASE_URL`, `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` e `CSRF_TRUSTED_ORIGINS`. A API fica na rede privada; o frontend encaminha os pedidos para ela. Não use `config.local` em produção.
+Railway usa a branch `main` de `879372/paulinho-api`. O Dockerfile executa `start.sh`, que aplica as migrações do banco próprio, cria o administrador inicial se solicitado e inicia Gunicorn na porta `$PORT` com IPv4/IPv6. Configure `DATABASE_URL`, `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` e `CSRF_TRUSTED_ORIGINS`. A API possui o endereço público https://gestao-web-production.up.railway.app; o frontend na Vercel encaminha os pedidos /api/ para ela. Não use `config.local` em produção.
