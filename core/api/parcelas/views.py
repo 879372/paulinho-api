@@ -58,8 +58,8 @@ def dar_baixa(request, pk):
     parcela.save()
     contrato = parcela.contrato
     if contrato.tipo == Contrato.Tipo.JUROS and parcela.tipo == Parcela.Tipo.JUROS:
-        proximo_vencimento = adicionar_periodo(parcela.data_vencimento, 1, contrato.periodicidade)
-        Parcela.objects.get_or_create(contrato=contrato, tipo=Parcela.Tipo.JUROS, data_vencimento=proximo_vencimento, defaults={'valor': contrato.valor_juros_mensal})
+        proximo_vencimento = adicionar_periodo(parcela.data_vencimento_original or parcela.data_vencimento, 1, contrato.periodicidade)
+        Parcela.objects.exclude(pk=parcela.pk).get_or_create(contrato=contrato, tipo=Parcela.Tipo.JUROS, data_vencimento=proximo_vencimento, defaults={'valor': contrato.valor_juros_mensal})
         if contrato.status != Contrato.Status.ATIVO:
             contrato.status = Contrato.Status.ATIVO
             contrato.save(update_fields=['status'])

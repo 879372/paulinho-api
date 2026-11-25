@@ -68,6 +68,7 @@ class Parcela(models.Model):
     transferida_para = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='parcelas_transferidas')
     numero = models.PositiveIntegerField(null=True, blank=True)
     valor = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
+    data_vencimento_original = models.DateField(null=True, blank=True)
     data_vencimento = models.DateField()
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDENTE)
     data_pagamento = models.DateField(null=True, blank=True)

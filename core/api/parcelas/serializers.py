@@ -10,8 +10,8 @@ class ParcelaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Parcela
-        fields = ['id', 'contrato', 'cliente_nome', 'contrato_tipo', 'produto', 'contrato_descricao', 'tipo', 'numero', 'valor', 'data_vencimento', 'status', 'data_pagamento', 'forma_pagamento', 'valor_pago', 'transferida_para']
-        read_only_fields = ['id', 'contrato', 'status', 'data_pagamento', 'forma_pagamento', 'valor_pago', 'transferida_para']
+        fields = ['id', 'contrato', 'cliente_nome', 'contrato_tipo', 'produto', 'contrato_descricao', 'tipo', 'numero', 'valor', 'data_vencimento', 'data_vencimento_original', 'status', 'data_pagamento', 'forma_pagamento', 'valor_pago', 'transferida_para']
+        read_only_fields = ['id', 'contrato', 'status', 'data_pagamento', 'forma_pagamento', 'valor_pago', 'transferida_para', 'data_vencimento_original']
 
     def get_contrato_descricao(self, parcela):
         if parcela.contrato.tipo == 'venda':

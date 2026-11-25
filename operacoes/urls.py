@@ -1,8 +1,10 @@
 from django.urls import path
+from core.vencimentos import vencimento_aluguel
 from core.adiamento import adiar_aluguel
 from . import views
 
 urlpatterns = [
+    path('alugueis/cobrancas/<int:pk>/vencimento/', vencimento_aluguel),
     path('alugueis/cobrancas/<int:pk>/adiar/', adiar_aluguel),
     path('motos/', views.MotosView.as_view()),
     path('alugueis/cobrancas/', views.CobrancasAluguelView.as_view()),

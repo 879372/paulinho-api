@@ -39,7 +39,7 @@ class CobrancaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CobrancaAluguel
-        fields = ['id', 'aluguel', 'vencimento', 'valor', 'pago_em', 'cliente_nome', 'placa', 'status', 'transferida_para']
+        fields = ['id', 'aluguel', 'vencimento', 'vencimento_original', 'valor', 'pago_em', 'cliente_nome', 'placa', 'status', 'transferida_para']
         read_only_fields = fields
 
 

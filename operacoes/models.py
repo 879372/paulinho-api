@@ -27,6 +27,7 @@ class Aluguel(AssinaturaDigital):
 
 class CobrancaAluguel(models.Model):
     aluguel = models.ForeignKey(Aluguel, on_delete=models.PROTECT, related_name='cobrancas')
+    vencimento_original = models.DateField(null=True, blank=True)
     vencimento = models.DateField()
     valor = models.DecimalField(max_digits=12, decimal_places=2)
     transferida_para = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='cobrancas_transferidas')
