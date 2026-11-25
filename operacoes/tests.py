@@ -144,9 +144,11 @@ class AssinaturaAutentiqueTests(TestCase):
         self.client.force_authenticate(get_user_model().objects.create_user('gestor-assinatura'))
         self.cliente = Cliente.objects.create(nome='Cliente Assina', telefone='85988887777')
         hoje = date.today()
-        self.contrato = Contrato.objects.create(cliente=self.cliente, tipo='emprestimo_tradicional', data_inicio=hoje, valor_principal=Decimal('1000'), taxa_juros_mensal=Decimal('5'), qtd_parcelas=2, valor_parcela=Decimal('550'))
-        Parcela.objects.create(contrato=self.contrato, numero=1, valor=Decimal('550'), data_vencimento=hoje)
-        self.url = f'/api/contratos/{self.contrato.pk}/assinatura/'
+        moto = Moto.objects.create(placa='TST1A23', modelo='CG 160')
+        self.contrato = Aluguel.objects.create(moto=moto, cliente=self.cliente, inicio=hoje, fim=hoje+timedelta(days=30), valor=Decimal('250'), periodicidade='semanal', primeiro_vencimento=hoje)
+        CobrancaAluguel.objects.create(aluguel=self.contrato, vencimento=hoje, valor=Decimal('250'))
+        self.url = f'/api/operacoes/alugueis/{self.contrato.pk}/assinatura/'
+
 
     @override_settings(AUTENTIQUE_TOKEN='')
     def test_sem_token_informa_configuracao(self):
@@ -291,3 +293,17 @@ class CategoriasFinanceirasTests(TestCase):
         self.assertEqual(fora['entradas'], 0)
         self.assertEqual(fora['saidas'], 0)
         self.assertEqual(fora['lancamentos'], [])
+
+
+class AssinaturaEmprestimoDesativadaTests(TestCase):
+    @override_settings(AUTENTIQUE_TOKEN='teste')
+    def test_api_nao_envia_emprestimos_para_assinatura(self):
+        client = APIClient()
+        client.force_authenticate(get_user_model().objects.create_user('emprestimo-sem-assinatura'))
+        cliente = Cliente.objects.create(nome='Cliente', telefone='84999990000')
+        contrato = Contrato.objects.create(cliente=cliente, tipo='emprestimo_tradicional', data_inicio=date.today(), valor_principal=Decimal('100'))
+        with mock.patch('core.assinatura.requests.post') as enviar:
+            response = client.post(f'/api/contratos/{contrato.pk}/assinatura/')
+            self.assertEqual(response.status_code, 405)
+            self.assertFalse(client.get(f'/api/contratos/{contrato.pk}/assinatura/').data['configurado'])
+            enviar.assert_not_called()
