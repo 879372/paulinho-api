@@ -31,6 +31,6 @@ def dashboard_view(request):
             status__in=[Parcela.Status.PENDENTE, Parcela.Status.ATRASADA],
         ).aggregate(total=Sum('valor'))['total'] or 0,
         'recebido_mes': parcelas.filter(status=Parcela.Status.PAGA, data_pagamento__year=hoje.year, data_pagamento__month=hoje.month).aggregate(total=Sum('valor_pago'))['total'] or 0,
-        'vencendo_hoje': parcelas.filter(data_vencimento=hoje).exclude(status=Parcela.Status.PAGA).count(),
+        'vencendo_hoje': parcelas.filter(data_vencimento=hoje).exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA]).count(),
         'atrasados': parcelas.filter(status=Parcela.Status.ATRASADA).count(),
     })

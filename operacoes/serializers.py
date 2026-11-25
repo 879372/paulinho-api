@@ -39,11 +39,13 @@ class CobrancaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CobrancaAluguel
-        fields = ['id', 'aluguel', 'vencimento', 'valor', 'pago_em', 'cliente_nome', 'placa', 'status']
+        fields = ['id', 'aluguel', 'vencimento', 'valor', 'pago_em', 'cliente_nome', 'placa', 'status', 'transferida_para']
         read_only_fields = fields
 
 
     def get_status(self, obj):
+        if obj.transferida_para_id:
+            return 'transferida'
         if obj.pago_em:
             return 'paga'
         return 'atrasada' if obj.vencimento < timezone.localdate() else 'pendente'

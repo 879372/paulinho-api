@@ -61,10 +61,11 @@ class Contrato(AssinaturaDigital):
 
 class Parcela(models.Model):
     class Tipo(models.TextChoices): PARCELA='parcela','Parcela'; JUROS='juros_mensal','Juros mensal'; QUITACAO='quitacao_principal','Quitação principal'
-    class Status(models.TextChoices): PENDENTE='pendente','Pendente'; PAGA='paga','Paga'; ATRASADA='atrasada','Atrasada'
+    class Status(models.TextChoices): PENDENTE='pendente','Pendente'; PAGA='paga','Paga'; ATRASADA='atrasada','Atrasada'; TRANSFERIDA='transferida','Transferida'
     class Forma(models.TextChoices): DINHEIRO='dinheiro','Dinheiro'; PIX='pix','PIX'; CARTAO='cartao','Cartão'
     contrato = models.ForeignKey(Contrato, on_delete=models.PROTECT, related_name='parcelas')
     tipo = models.CharField(max_length=24, choices=Tipo.choices, default=Tipo.PARCELA)
+    transferida_para = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='parcelas_transferidas')
     numero = models.PositiveIntegerField(null=True, blank=True)
     valor = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     data_vencimento = models.DateField()

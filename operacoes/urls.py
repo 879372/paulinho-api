@@ -1,7 +1,9 @@
 from django.urls import path
+from core.adiamento import adiar_aluguel
 from . import views
 
 urlpatterns = [
+    path('alugueis/cobrancas/<int:pk>/adiar/', adiar_aluguel),
     path('motos/', views.MotosView.as_view()),
     path('alugueis/cobrancas/', views.CobrancasAluguelView.as_view()),
     path('alugueis/', views.AlugueisView.as_view()),

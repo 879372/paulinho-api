@@ -49,7 +49,7 @@ def montar_locacao(aluguel: Aluguel, nivel=0):
     doc.clausula('Do foro', 'Fica eleito o foro da comarca do domicílio do LOCATÁRIO, com renúncia a qualquer outro.')
     doc.assinaturas(aluguel.inicio, 'LOCADOR', 'LOCATÁRIO', cliente.nome)
 
-    itens = [(c.vencimento, c.valor) for c in aluguel.cobrancas.order_by('vencimento')]
+    itens = [(c.vencimento, c.valor) for c in aluguel.cobrancas.filter(transferida_para__isnull=True).order_by('vencimento')]
     doc.cronograma('ANEXO I – CRONOGRAMA DE ALUGUÉIS', itens, f'{len(itens)} aluguéis {plural} de {moeda(aluguel.valor)}, de {data_br(aluguel.inicio)} a {data_br(aluguel.fim)}.')
     doc.checklist('ANEXO II – VISTORIA', ITENS_VISTORIA, 'Marque OK ou anote a avaria na entrega e na devolução.')
     return doc

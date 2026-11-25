@@ -30,7 +30,7 @@ def verificar_conexao():
 
 def tarefas(hoje):
     parcelas = list(Parcela.objects.select_related('contrato__cliente').filter(status__in=[Parcela.Status.PENDENTE, Parcela.Status.ATRASADA], data_vencimento__lte=hoje).exclude(contrato__status__in=[Contrato.Status.CANCELADO, Contrato.Status.QUITADO, Contrato.Status.RENEGOCIADO]).order_by('data_vencimento', 'id'))
-    alugueis = list(CobrancaAluguel.objects.select_related('aluguel__cliente', 'aluguel__moto').filter(pago_em__isnull=True, vencimento__lte=hoje).order_by('vencimento', 'id'))
+    alugueis = list(CobrancaAluguel.objects.select_related('aluguel__cliente', 'aluguel__moto').filter(pago_em__isnull=True, transferida_para__isnull=True, vencimento__lte=hoje).order_by('vencimento', 'id'))
     resumo = montar_resumo(parcelas, contas_vencendo_em(hoje))
     if alugueis:
         linhas = ['','', '*ALUGUÉIS DE MOTOS*']

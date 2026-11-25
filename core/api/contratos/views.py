@@ -44,7 +44,7 @@ def concluir_contrato(request, pk):
     if contrato.status == Contrato.Status.QUITADO:
         return Response({'detail': 'Este contrato já está concluído.'}, status=400)
 
-    parcelas_abertas = contrato.parcelas.exclude(status=Parcela.Status.PAGA)
+    parcelas_abertas = contrato.parcelas.exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA])
     MensagemEnviada.objects.filter(parcela__in=parcelas_abertas).delete()
     parcelas_abertas.delete()
     contrato.status = Contrato.Status.QUITADO
@@ -74,7 +74,7 @@ def quitar_principal(request, pk):
     serializer.is_valid(raise_exception=True)
     dados = serializer.validated_data
     pagamento = dados.get('data_pagamento', date.today())
-    contrato.parcelas.filter(tipo=Parcela.Tipo.JUROS).exclude(status=Parcela.Status.PAGA).delete()
+    contrato.parcelas.filter(tipo=Parcela.Tipo.JUROS).exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA]).delete()
     parcela = Parcela.objects.create(contrato=contrato, tipo=Parcela.Tipo.QUITACAO, valor=contrato.valor_principal, data_vencimento=pagamento, status=Parcela.Status.PAGA, data_pagamento=pagamento, forma_pagamento=dados['forma_pagamento'], valor_pago=contrato.valor_principal)
     contrato.data_quitacao_principal = pagamento
     contrato.status = Contrato.Status.QUITADO
@@ -115,7 +115,7 @@ def editar_contrato(request, pk):
         serializer = ContratoJurosUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         dados = serializer.validated_data
-        abertas = list(contrato.parcelas.select_for_update().filter(tipo=Parcela.Tipo.JUROS).exclude(status=Parcela.Status.PAGA))
+        abertas = list(contrato.parcelas.select_for_update().filter(tipo=Parcela.Tipo.JUROS).exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA]))
         if not abertas:
             return Response({'detail': 'Este contrato não possui cobrança aberta para editar.'}, status=400)
         vencimento = proximo_vencimento_recorrente(dados['periodicidade'], dados.get('dia_vencimento'), dados.get('dia_semana'))
@@ -139,7 +139,7 @@ def editar_contrato(request, pk):
     serializer = ContratoUpdateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     dados = serializer.validated_data
-    abertas = list(contrato.parcelas.select_for_update().exclude(status=Parcela.Status.PAGA).order_by('numero', 'data_vencimento'))
+    abertas = list(contrato.parcelas.select_for_update().exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA]).order_by('numero', 'data_vencimento'))
     if not abertas:
         return Response({'detail': 'Este contrato não possui cobranças abertas para editar.'}, status=400)
     pagas = list(contrato.parcelas.select_for_update().filter(status=Parcela.Status.PAGA))

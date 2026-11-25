@@ -35,10 +35,12 @@ class CobrancasAluguelView(generics.ListAPIView):
             for item in status.split(','):
                 if item == 'paga':
                     filtro |= Q(pago_em__isnull=False)
+                elif item == 'transferida':
+                    filtro |= Q(transferida_para__isnull=False)
                 elif item == 'atrasada':
-                    filtro |= Q(pago_em__isnull=True, vencimento__lt=hoje)
+                    filtro |= Q(pago_em__isnull=True, transferida_para__isnull=True, vencimento__lt=hoje)
                 elif item == 'pendente':
-                    filtro |= Q(pago_em__isnull=True, vencimento__gte=hoje)
+                    filtro |= Q(pago_em__isnull=True, transferida_para__isnull=True, vencimento__gte=hoje)
                 else:
                     raise serializers.ValidationError({'status': 'Status inválido.'})
             qs = qs.filter(filtro)
@@ -73,7 +75,11 @@ class MovimentosView(generics.ListCreateAPIView):
 @api_view(['POST'])
 @transaction.atomic
 def receber_aluguel(request, pk):
+    inicial = get_object_or_404(CobrancaAluguel, pk=pk)
+    Aluguel.objects.select_for_update().get(pk=inicial.aluguel_id)
     cobranca = get_object_or_404(CobrancaAluguel.objects.select_for_update().select_related('aluguel__moto'), pk=pk)
+    if cobranca.transferida_para_id:
+        raise serializers.ValidationError('Esta cobrança foi transferida para a próxima.')
     class PagamentoSerializer(serializers.Serializer):
         data = serializers.DateField()
     serializer = PagamentoSerializer(data=request.data)

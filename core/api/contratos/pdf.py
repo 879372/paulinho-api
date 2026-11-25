@@ -14,14 +14,14 @@ def data_br(data):
 
 
 def status_label(status):
-    return {'paga': 'Paga', 'atrasada': 'Em atraso', 'pendente': 'Pendente'}.get(status, status.title())
+    return {'paga': 'Paga', 'atrasada': 'Em atraso', 'pendente': 'Pendente', 'transferida': 'Transferida'}.get(status, status.title())
 
 
 def comprovante_pdf(contrato):
     parcelas = list(contrato.parcelas.all())
-    total = sum((item.valor for item in parcelas), Decimal('0'))
+    total = sum((item.valor for item in parcelas if item.status != 'transferida'), Decimal('0'))
     recebido = sum((item.valor_pago if item.valor_pago is not None else item.valor for item in parcelas if item.status == 'paga'), Decimal('0'))
-    aberto = sum((item.valor for item in parcelas if item.status != 'paga'), Decimal('0'))
+    aberto = sum((item.valor for item in parcelas if item.status in ('pendente', 'atrasada')), Decimal('0'))
     story = header('Comprovante de contrato', f'Contrato #{contrato.pk:05d} · {contrato.get_tipo_display()}')
     story.append(metrics([('Total das cobranças', moeda(total)), ('Recebido', moeda(recebido)), ('Em aberto', moeda(aberto))]))
     story.extend([section('Dados do cliente'), cards([('Nome', contrato.cliente.nome), ('Telefone', contrato.cliente.telefone), ('CPF', contrato.cliente.cpf or 'Não informado'), ('Endereço', contrato.cliente.endereco or 'Não informado')])])
@@ -36,8 +36,8 @@ def comprovante_pdf(contrato):
     hoje = timezone.localdate()
     rows = []
     for item in parcelas:
-        status = 'atrasada' if item.status != 'paga' and item.data_vencimento < hoje else item.status
-        rows.append([str(item.numero or ('Quitação' if item.tipo == 'quitacao_principal' else 'Juros')), data_br(item.data_vencimento), moeda(item.valor), data_br(item.data_pagamento), status_label(status)])
+        status = 'atrasada' if item.status in ('pendente', 'atrasada') and item.data_vencimento < hoje else item.status
+        rows.append([str(item.numero or ('Quitação' if item.tipo == 'quitacao_principal' else 'Juros' if item.tipo == 'juros_mensal' else 'Saldo')), data_br(item.data_vencimento), moeda(item.valor), data_br(item.data_pagamento), status_label(status)])
     story.append(grid(['Parcela', 'Vencimento', 'Valor', 'Pagamento', 'Status'], rows, [.13,.22,.23,.22,.20]))
     declaracao = [Spacer(1,12),p('O cliente declara ciência das informações desta operação e dos valores e vencimentos indicados neste documento.', 'small')]
     if contrato.observacoes:

@@ -39,8 +39,13 @@ class ParcelaListView(generics.ListAPIView):
 
 
 @api_view(['PATCH'])
+@transaction.atomic
 def dar_baixa(request, pk):
-    parcela = get_object_or_404(Parcela.objects.select_related('contrato'), pk=pk)
+    inicial = get_object_or_404(Parcela, pk=pk)
+    Contrato.objects.select_for_update().get(pk=inicial.contrato_id)
+    parcela = get_object_or_404(Parcela.objects.select_for_update().select_related('contrato'), pk=pk)
+    if parcela.status == Parcela.Status.TRANSFERIDA:
+        return Response({'detail': 'Parcela transferida para a próxima cobrança.'}, status=400)
     if parcela.status == Parcela.Status.PAGA:
         return Response({'detail': 'Parcela já está paga.'}, status=400)
     serializer = BaixaParcelaSerializer(data=request.data)
@@ -58,7 +63,7 @@ def dar_baixa(request, pk):
         if contrato.status != Contrato.Status.ATIVO:
             contrato.status = Contrato.Status.ATIVO
             contrato.save(update_fields=['status'])
-    elif not contrato.parcelas.exclude(status=Parcela.Status.PAGA).exists():
+    elif not contrato.parcelas.exclude(status__in=[Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA]).exists():
         contrato.status = Contrato.Status.QUITADO
         contrato.save(update_fields=['status'])
     return Response(ParcelaSerializer(parcela).data)

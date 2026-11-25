@@ -29,6 +29,7 @@ class CobrancaAluguel(models.Model):
     aluguel = models.ForeignKey(Aluguel, on_delete=models.PROTECT, related_name='cobrancas')
     vencimento = models.DateField()
     valor = models.DecimalField(max_digits=12, decimal_places=2)
+    transferida_para = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='cobrancas_transferidas')
     pago_em = models.DateField(null=True, blank=True)
 
     class Meta:

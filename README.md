@@ -53,3 +53,11 @@ Inclui parcelas de empréstimos/vendas e cobranças de aluguel vencendo hoje ou 
 `python manage.py enviar_lembretes_diarios --dry-run` verifica a conexão e conta as tarefas sem enviar mensagens ou registrar envios. A tabela `core_lembretediario` garante uma tentativa por cobrança/dia, inclusive em execuções simultâneas. O resumo do proprietário usa uma versão do conteúdo: se as contas ou cobranças mudarem, a próxima execução envia o resumo atualizado; conteúdo igual não é repetido. Para atualizar só o proprietário, execute `python manage.py enviar_lembretes_diarios --somente-resumo`. Falhas isoladas ficam registradas e não interrompem os outros destinatários; qualquer falha faz o comando terminar com erro. Evita-se reenvio automático no mesmo dia em caso de timeout, pois a Evolution pode ter recebido a mensagem. O dia seguinte cria uma nova tentativa para cobranças ainda abertas.
 
 Não agendar simultaneamente os comandos antigos `enviar_cobrancas_do_dia` e `enviar_lembretes_atraso`: o novo comando já cobre os dois fluxos. Para mudar o horário, atualizar `cronSchedule` do serviço no Railway, sempre em UTC.
+
+## Transferir saldo para a próxima cobrança
+
+A opção **Somar à próxima** consulta uma prévia (valor atual + próxima cobrança e vencimento) e exige confirmação. O POST verifica se os valores continuam iguais, bloqueia o contrato durante a alteração e rejeita cobranças pagas ou já transferidas. A cobrança antiga mantém valor e histórico, com estado Transferida e vínculo para o destino. Ela não entra novamente nos saldos, lembretes ou recebimentos.
+
+Sem próxima cobrança, prorroga somente o saldo para um período depois, sem inventar outra mensalidade. Em somente juros, soma o saldo aos juros normais do próximo período, sem capitalizar juros sobre o valor transferido. O período respeita a recorrência do contrato (semanal, quinzenal ou mensal). Não cria entrada de caixa.
+
+O cron usa `sh start_lembretes.sh`, aguardando as migrações do web antes de executar os lembretes.

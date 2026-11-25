@@ -17,7 +17,7 @@ def status_label(status):
         Contrato.Status.ATIVO: 'Ativo', Contrato.Status.ATRASADO: 'Atrasado',
         Contrato.Status.QUITADO: 'Quitado', Contrato.Status.RENEGOCIADO: 'Renegociado',
         Contrato.Status.CANCELADO: 'Cancelado', Parcela.Status.PAGA: 'Paga',
-        Parcela.Status.PENDENTE: 'Pendente', Parcela.Status.ATRASADA: 'Em atraso',
+        Parcela.Status.PENDENTE: 'Pendente', Parcela.Status.ATRASADA: 'Em atraso', Parcela.Status.TRANSFERIDA: 'Transferida',
     }.get(status, status.title())
 
 
@@ -26,7 +26,7 @@ def valor_quitacao(contrato):
         return Decimal('0')
     if contrato.tipo == Contrato.Tipo.JUROS:
         return contrato.valor_principal or Decimal('0')
-    return sum((parcela.valor for parcela in contrato.parcelas.all() if parcela.status != Parcela.Status.PAGA), Decimal('0'))
+    return sum((parcela.valor for parcela in contrato.parcelas.all() if parcela.status not in (Parcela.Status.PAGA, Parcela.Status.TRANSFERIDA)), Decimal('0'))
 
 
 def valor_emprestado_somente_juros(contrato):
@@ -65,8 +65,8 @@ def relatorio_cliente_pdf(cliente):
             story.append(KeepTogether(topo))
             rows = []
             for parcela in parcelas:
-                numero = str(parcela.numero) if parcela.numero else ('Quitação' if parcela.tipo == Parcela.Tipo.QUITACAO else 'Juros')
-                status = 'atrasada' if parcela.status != 'paga' and parcela.data_vencimento < hoje else parcela.status
+                numero = str(parcela.numero) if parcela.numero else ('Quitação' if parcela.tipo == Parcela.Tipo.QUITACAO else 'Juros' if parcela.tipo == Parcela.Tipo.JUROS else 'Saldo')
+                status = 'atrasada' if parcela.status in ('pendente', 'atrasada') and parcela.data_vencimento < hoje else parcela.status
                 rows.append([numero,data_br(parcela.data_vencimento),moeda(parcela.valor),data_br(parcela.data_pagamento),status_label(status)])
             story.extend([grid(['Parcela','Vencimento','Valor','Pagamento','Status'],rows,[.13,.22,.23,.22,.20]),Spacer(1,20)])
     if not contratos:

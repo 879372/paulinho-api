@@ -25,7 +25,7 @@ def _vencimento(contrato):
 def montar_mutuo(contrato: Contrato, nivel=0):
     juros = contrato.tipo == Contrato.Tipo.JUROS
     plural, unidade = PERIODO.get(contrato.periodicidade, PERIODO['mensal'])
-    parcelas = list(contrato.parcelas.all())
+    parcelas = list(contrato.parcelas.exclude(status='transferida'))
     valor_juros = Decimal(contrato.valor_juros_mensal or contrato.valor_parcela or 0)
     principal = Decimal(contrato.valor_principal or 0)
     # No "somente juros", o valor de quitação já inclui uma cobrança de juros (mesma regra da tela do cliente).
