@@ -67,3 +67,26 @@ class LembretesDiariosTests(TestCase):
             call_command('enviar_lembretes_diarios', stdout=StringIO())
         enviar.assert_not_called()
         self.assertEqual(LembreteDiario.objects.count(), 0)
+
+
+    @patch('core.management.commands.enviar_lembretes_diarios.verificar_conexao')
+    @patch('core.management.commands.enviar_lembretes_diarios.enviar_whatsapp')
+    def test_resumo_atualiza_ao_mudar_contas_sem_repetir_cobrancas(self, enviar, verificar):
+        call_command('enviar_lembretes_diarios', stdout=StringIO())
+        self.assertEqual(enviar.call_count, 5)
+        ContaPagar.objects.create(descricao='Internet nova', dia_vencimento=self.hoje.day)
+        call_command('enviar_lembretes_diarios', stdout=StringIO())
+        self.assertEqual(enviar.call_count, 6)
+        self.assertEqual(enviar.call_args.args[0], '5584999990000')
+        self.assertIn('Internet nova', enviar.call_args.args[1])
+        call_command('enviar_lembretes_diarios', stdout=StringIO())
+        self.assertEqual(enviar.call_count, 6)
+
+    @patch('core.management.commands.enviar_lembretes_diarios.verificar_conexao')
+    @patch('core.management.commands.enviar_lembretes_diarios.enviar_whatsapp')
+    def test_somente_resumo_nao_envia_a_clientes(self, enviar, verificar):
+        call_command('enviar_lembretes_diarios', somente_resumo=True, stdout=StringIO())
+        self.assertEqual(enviar.call_count, 1)
+        self.assertIn('Energia', enviar.call_args.args[1])
+        self.assertIn('VENCEM HOJE', enviar.call_args.args[1])
+        self.assertFalse(LembreteDiario.objects.filter(chave__startswith='parcela-').exists())

@@ -1,11 +1,11 @@
 from decimal import Decimal
+from hashlib import sha256
 import time
 from urllib.parse import quote
 
 import requests
 from django.conf import settings
 from django.core.management import BaseCommand, CommandError
-from django.db.models import Q
 from django.utils import timezone
 from core.api.cobrancas.services import gerar_juros_mensais, atualizar_atrasos
 from core.models import Contrato, LembreteDiario, Parcela
@@ -40,7 +40,8 @@ def tarefas(hoje):
         total = sum((item.valor for item in alugueis), Decimal('0')) + sum((p.valor for p in parcelas), Decimal('0'))
         linhas.extend(['', f'*TOTAL GERAL A RECEBER: {moeda(total)}*'])
         resumo += '\n'.join(linhas)
-    yield 'resumo-proprietario', settings.OWNER_WHATSAPP, resumo
+    versao = sha256(f'{settings.OWNER_WHATSAPP}\n{resumo}'.encode()).hexdigest()[:24]
+    yield f'resumo-proprietario-{versao}', settings.OWNER_WHATSAPP, resumo
     for parcela in parcelas:
         _, descricao, prazo = referencia_parcela(parcela)
         situacao = 'vence hoje' if parcela.data_vencimento == hoje else 'está em atraso'
@@ -58,6 +59,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true', help='Valida conexão e conta tarefas sem enviar mensagens ou alterar dados.')
 
+        parser.add_argument('--somente-resumo', action='store_true', help='Atualiza somente o resumo do proprietário, sem cobrar clientes.')
+
     def handle(self, *args, **options):
         verificar_conexao()
         hoje = timezone.localdate()
@@ -66,6 +69,8 @@ class Command(BaseCommand):
             atualizar_atrasos()
         enviados = falhas = ignorados = previstos = 0
         for chave, telefone, texto in tarefas(hoje):
+            if options['somente_resumo'] and not chave.startswith('resumo-proprietario-'):
+                continue
             previstos += 1
             if options['dry_run']:
                 continue
