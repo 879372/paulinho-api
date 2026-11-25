@@ -9,6 +9,7 @@ urlpatterns = [
     path('motos/', views.MotosView.as_view()),
     path('alugueis/cobrancas/', views.CobrancasAluguelView.as_view()),
     path('alugueis/', views.AlugueisView.as_view()),
+    path('alugueis/<int:pk>/caucao/', views.atualizar_caucao),
     path('alugueis/<int:pk>/contrato/', views.contrato_aluguel),
     path('alugueis/<int:pk>/assinatura/', views.assinatura_aluguel),
     path('alugueis/<int:pk>/assinatura/pdf/', views.assinatura_aluguel_pdf),

@@ -20,6 +20,7 @@ class Aluguel(AssinaturaDigital):
     inicio = models.DateField()
     fim = models.DateField()
     valor = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    valor_caucao = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0'))])
     periodicidade = models.CharField(max_length=8, choices=[('semanal', 'Semanal'), ('mensal', 'Mensal')])
     primeiro_vencimento = models.DateField()
     observacoes = models.TextField(blank=True)

@@ -162,3 +162,18 @@ def financeiro(request):
         despesas = sum((m.valor for m in lote.movimentos.all() if m.tipo == 'saida'), Decimal('0'))
         lotes.append({'id': lote.pk, 'nome': lote.identificacao, 'receitas': entradas_lote, 'despesas': despesas, 'resultado': entradas_lote - despesas})
     return Response({'inicio': inicio, 'fim': fim, 'entradas': entradas, 'saidas': saidas, 'saldo_periodo': entradas - saidas, 'recebido_emprestimos': total(recebimentos, 'valor_pago'), 'capital_emprestado': total(emprestimos, 'valor_principal'), 'lotes': lotes, 'categorias': list(categorias.values()), 'lancamentos': lancamentos})
+
+
+@api_view(['PATCH'])
+@transaction.atomic
+def atualizar_caucao(request, pk):
+    aluguel = get_object_or_404(Aluguel.objects.select_for_update(), pk=pk)
+    if aluguel.assinatura_status in ('pendente', 'assinado'):
+        raise serializers.ValidationError('Não é possível mudar a caução de um contrato já enviado para assinatura.')
+    class CaucaoSerializer(serializers.Serializer):
+        valor_caucao = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'))
+    serializer = CaucaoSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    aluguel.valor_caucao = serializer.validated_data['valor_caucao']
+    aluguel.save(update_fields=['valor_caucao'])
+    return Response(AluguelSerializer(aluguel).data)

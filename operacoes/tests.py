@@ -307,3 +307,39 @@ class AssinaturaEmprestimoDesativadaTests(TestCase):
             self.assertEqual(response.status_code, 405)
             self.assertFalse(client.get(f'/api/contratos/{contrato.pk}/assinatura/').data['configurado'])
             enviar.assert_not_called()
+
+
+class CaucaoAluguelTests(TestCase):
+    setUp = OperacoesTests.setUp
+    post = OperacoesTests.post
+    aluguel = OperacoesTests.aluguel
+
+    def test_cadastra_caucao_sem_cobrar_ou_lancar_receita(self):
+        resposta=self.aluguel(valor_caucao='500.00')
+        self.assertEqual(resposta.status_code,201,resposta.data)
+        self.assertEqual(resposta.data['valor_caucao'],'500.00')
+        self.assertEqual(len(resposta.data['cobrancas']),3)
+        self.assertTrue(all(item['valor']=='100.00' for item in resposta.data['cobrancas']))
+        self.assertEqual(Movimento.objects.count(),0)
+
+    def test_informa_caucao_em_aluguel_existente_e_permite_sem_caucao(self):
+        resposta=self.aluguel()
+        self.assertIsNone(resposta.data['valor_caucao'])
+        url=f"/api/operacoes/alugueis/{resposta.data['id']}/caucao/"
+        editar=self.client.patch(url,{'valor_caucao':'250.00'})
+        self.assertEqual(editar.status_code,200,editar.data)
+        self.assertEqual(editar.data['valor_caucao'],'250.00')
+        self.assertEqual(self.client.patch(url,{'valor_caucao':'0.00'}).data['valor_caucao'],'0.00')
+        self.assertEqual(Movimento.objects.count(),0)
+
+    def test_rejeita_negativo_e_preserva_contrato_enviado_para_assinatura(self):
+        self.assertEqual(self.aluguel(valor_caucao='-1').status_code,400)
+        resposta=self.aluguel(valor_caucao='100')
+        aluguel=Aluguel.objects.get(pk=resposta.data['id'])
+        aluguel.assinatura_status='pendente';aluguel.save()
+        url=f'/api/operacoes/alugueis/{aluguel.pk}/caucao/'
+        self.assertEqual(self.client.patch(url,{'valor_caucao':'200'}).status_code,400)
+        aluguel.refresh_from_db()
+        self.assertEqual(aluguel.valor_caucao,Decimal('100'))
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.patch(url,{'valor_caucao':'200'}).status_code,401)

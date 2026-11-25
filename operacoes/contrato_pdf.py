@@ -22,10 +22,11 @@ def montar_locacao(aluguel: Aluguel, nivel=0):
         f'O LOCADOR loca ao LOCATÁRIO a motocicleta <b>{t(moto.modelo)}</b>, placa <b>{t(moto.placa)}</b>, RENAVAM {LACUNA}, ano/cor {LACUNA}, '
         f'de <b>{data_br(aluguel.inicio)}</b> a <b>{data_br(aluguel.fim)}</b>, entregue em perfeito estado conforme a vistoria abaixo.',
         'A prorrogação depende de aditivo escrito; permanecendo o LOCATÁRIO com a moto após o término sem oposição, a locação segue pelo mesmo aluguel por prazo indeterminado (CC, art. 574).')
+    caucao = (f'Caução: R$ {LACUNA} ( ) não se aplica.' if aluguel.valor_caucao is None else 'Não foi estipulada caução para esta locação.' if aluguel.valor_caucao == 0 else f'Caução ajustada em {valor_completo(aluguel.valor_caucao)}, restituída em até 10 (dez) dias após a devolução, deduzidos débitos, multas, franquias e reparos de responsabilidade do LOCATÁRIO.')
     doc.clausula('Do aluguel e da garantia',
         f'O aluguel {periodo} é de {valor_completo(aluguel.valor)}, com primeiro vencimento em <b>{data_br(aluguel.primeiro_vencimento)}</b> e os demais a cada {unidade}, '
         'pago por PIX, transferência ou em espécie, valendo o comprovante como quitação. Combustível, pedágios e estacionamentos correm por conta do LOCATÁRIO.',
-        f'Caução: R$ {LACUNA} ( ) não se aplica, restituída em até 10 (dez) dias após a devolução, deduzidos débitos, multas, franquias e reparos de responsabilidade do LOCATÁRIO.')
+        caucao)
     doc.clausula('Do atraso',
         f'O atraso sujeita o LOCATÁRIO a multa de 2% (dois por cento) e juros de 1% (um por cento) ao mês pro rata die. Atraso superior a {tolerancia} dias autoriza a rescisão, '
         'devendo a moto ser devolvida imediatamente, sem prejuízo da cobrança e das medidas judiciais cabíveis.')

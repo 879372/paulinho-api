@@ -61,3 +61,9 @@ A opção **Somar à próxima** consulta uma prévia (valor atual + próxima cob
 Sem próxima cobrança, prorroga somente o saldo para um período depois, sem inventar outra mensalidade. Em somente juros, soma o saldo aos juros normais do próximo período, sem capitalizar juros sobre o valor transferido. O período respeita a recorrência do contrato (semanal, quinzenal ou mensal). Não cria entrada de caixa.
 
 O cron usa `sh start_lembretes.sh`, aguardando as migrações do web antes de executar os lembretes.
+
+## Caução dos aluguéis
+
+`valor_caucao` registra a garantia combinada, com valor mínimo zero. Não gera mensalidade, cobrança ou entrada automática no caixa. No formulário Novo aluguel, use 0 quando não houver caução. Cadastros anteriores preservam o valor como não informado até que seja preenchido.
+
+A lista dos aluguéis oferece Informar/Editar caução, por `PATCH /api/operacoes/alugueis/<id>/caucao/`. Contratos já enviados ou assinados não permitem alterar o valor, preservando o documento enviado. O contrato PDF exibe o valor por extenso; zero informa que não há caução, e valor não informado mantém o campo em branco.
