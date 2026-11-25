@@ -17,7 +17,7 @@ def enviar_whatsapp(numero, texto):
     if not all([settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY, settings.EVOLUTION_INSTANCE]):
         raise RuntimeError('Evolution API não configurada.')
 
-    url = f'{settings.EVOLUTION_API_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}'
+    url = f'{settings.EVOLUTION_API_URL.rstrip('/')}/message/sendText/{settings.EVOLUTION_INSTANCE}'
 
     response = requests.post(
         url,

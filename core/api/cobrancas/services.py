@@ -1,17 +1,18 @@
 from calendar import monthrange
 from datetime import date
+from django.utils import timezone
 from django.db.models import Case, IntegerField, Q, Value, When
 from core.models import Contrato, Parcela
 from core.api.contratos.services import proximo_dia_semana
 
 
 def atualizar_atrasos():
-    Parcela.objects.filter(status=Parcela.Status.PENDENTE, data_vencimento__lt=date.today()).update(status=Parcela.Status.ATRASADA)
+    Parcela.objects.filter(status=Parcela.Status.PENDENTE, data_vencimento__lt=timezone.localdate()).update(status=Parcela.Status.ATRASADA)
     Contrato.objects.filter(parcelas__status=Parcela.Status.ATRASADA).exclude(status=Contrato.Status.QUITADO).update(status=Contrato.Status.ATRASADO)
 
 
 def gerar_juros_mensais(referencia=None):
-    referencia = referencia or date.today()
+    referencia = referencia or timezone.localdate()
     contratos = Contrato.objects.filter(tipo=Contrato.Tipo.JUROS, status=Contrato.Status.ATIVO)
     for contrato in contratos:
         if contrato.parcelas.filter(tipo=Parcela.Tipo.JUROS).exists():
@@ -25,7 +26,7 @@ def gerar_juros_mensais(referencia=None):
 
 def cobrancas_do_dia():
     atualizar_atrasos()
-    hoje = date.today()
+    hoje = timezone.localdate()
     return (
         Parcela.objects.select_related('contrato__cliente')
         .filter(

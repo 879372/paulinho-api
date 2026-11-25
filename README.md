@@ -42,3 +42,14 @@ Para backup no S3, programe `python manage.py backup_database` no cron e configu
 ## Publicação deste projeto
 
 Railway usa a branch `main` de `879372/paulinho-api`. O Dockerfile executa `start.sh`, que aplica as migrações do banco próprio, cria o administrador inicial se solicitado e inicia Gunicorn na porta `$PORT` com IPv4/IPv6. Configure `DATABASE_URL`, `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` e `CSRF_TRUSTED_ORIGINS`. A API possui o endereço público https://gestao-web-production.up.railway.app; o frontend na Vercel encaminha os pedidos /api/ para ela. Não use `config.local` em produção.
+
+
+## Lembretes automáticos de WhatsApp
+
+O serviço Railway `lembretes-diarios` executa `python manage.py enviar_lembretes_diarios` às 08h de Fortaleza (cron UTC `0 11 * * *`). Usa o mesmo banco do web e as variáveis `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE` e `OWNER_WHATSAPP` por referências do Railway. O processo termina ao concluir; não executar Gunicorn nesse serviço.
+
+Inclui parcelas de empréstimos/vendas e cobranças de aluguel vencendo hoje ou atrasadas. O responsável recebe o resumo dessas cobranças e as contas a pagar ativas que vencem hoje. Despesas já realizadas do Financeiro não são contas futuras. Cobranças pagas não entram; contratos cancelados, renegociados e quitados são excluídos.
+
+`python manage.py enviar_lembretes_diarios --dry-run` verifica a conexão e conta as tarefas sem enviar mensagens ou registrar envios. A tabela `core_lembretediario` garante uma tentativa por cobrança/dia, inclusive em execuções simultâneas. Falhas isoladas ficam registradas e não interrompem os outros destinatários; qualquer falha faz o comando terminar com erro. Evita-se reenvio automático no mesmo dia em caso de timeout, pois a Evolution pode ter recebido a mensagem. O dia seguinte cria uma nova tentativa para cobranças ainda abertas.
+
+Não agendar simultaneamente os comandos antigos `enviar_cobrancas_do_dia` e `enviar_lembretes_atraso`: o novo comando já cobre os dois fluxos. Para mudar o horário, atualizar `cronSchedule` do serviço no Railway, sempre em UTC.

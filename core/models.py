@@ -97,3 +97,13 @@ class ContaPagar(models.Model):
 
     def __str__(self):
         return f'{self.descricao} — todo dia {self.dia_vencimento}'
+
+
+class LembreteDiario(models.Model):
+    chave = models.CharField(max_length=100)
+    data = models.DateField()
+    status = models.CharField(max_length=12, default='processando')
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['chave', 'data'], name='lembrete_unico_por_dia')]
