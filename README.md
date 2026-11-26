@@ -76,3 +76,8 @@ No painel de assinatura do aluguel, gere e compartilhe o link do cadastro. O cli
 O token fica no fragmento do link, é enviado à API no corpo e só seu hash é salvo. O cadastro pertence ao aluguel, sem alterar o cadastro geral do cliente. Enviar à Autentique é uma ação separada, habilitada somente após validação completa. O envio usa o WhatsApp cadastrado pelo operador.
 
 O contrato não cobra multa nem juros de mora. Despesas de uso e manutenção preventiva durante a locação ficam com o locatário; defeitos anteriores permanecem com o locador. Para a qualificação fixa do locador, configure COMPANY_LEGAL_NAME, COMPANY_CNPJ ou COMPANY_CPF, COMPANY_ADDRESS e COMPANY_PHONE; AUTENTIQUE_EMAIL_EMPRESA define o e-mail do signatário da empresa.
+
+
+## Caução no Financeiro
+
+No aluguel, Registrar recebimento da caução cria uma entrada na categoria Aluguel de motos; Registrar devolução cria uma saída do valor integral recebido. Ambas pedem a data efetiva (sem datas futuras). Os lançamentos ficam vinculados ao aluguel, sem gerar mensalidades. A devolução exige recebimento anterior e não pode ter data anterior a ele. Repetir a operação é bloqueado, inclusive com requisições simultâneas. Após receber, o valor combinado não pode mais ser editado. Cauções antigas não são lançadas automaticamente: registre a data real do recebimento.

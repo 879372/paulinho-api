@@ -53,6 +53,13 @@ class CobrancaSerializer(serializers.ModelSerializer):
 
 
 class AluguelSerializer(serializers.ModelSerializer):
+    caucao_financeiro = serializers.SerializerMethodField()
+
+    def get_caucao_financeiro(self, obj):
+        def movimento(item):
+            return {'id': item.pk, 'data': item.data, 'valor': item.valor} if item else None
+        return {'recebimento': movimento(obj.caucao_recebimento), 'devolucao': movimento(obj.caucao_devolucao)}
+
     cadastro_completo = serializers.SerializerMethodField()
 
     def get_cadastro_completo(self, obj):
@@ -65,7 +72,7 @@ class AluguelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Aluguel
         exclude = ['assinatura_id', 'cadastro_token_hash', 'dados_locatario']
-        read_only_fields = ['assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox', 'cadastro_expira_em', 'cadastro_preenchido_em']
+        read_only_fields = ['caucao_recebimento', 'caucao_devolucao', 'assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox', 'cadastro_expira_em', 'cadastro_preenchido_em']
 
     def validate(self, attrs):
         if attrs['fim'] < attrs['inicio']:

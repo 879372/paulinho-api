@@ -13,6 +13,8 @@ urlpatterns = [
     path('motos/', views.MotosView.as_view()),
     path('alugueis/cobrancas/', views.CobrancasAluguelView.as_view()),
     path('alugueis/', views.AlugueisView.as_view()),
+    path('alugueis/<int:pk>/caucao/receber/', views.movimentar_caucao, {'acao': 'receber'}),
+    path('alugueis/<int:pk>/caucao/devolver/', views.movimentar_caucao, {'acao': 'devolver'}),
     path('alugueis/<int:pk>/caucao/', views.atualizar_caucao),
     path('alugueis/<int:pk>/contrato/', views.contrato_aluguel),
     path('alugueis/<int:pk>/assinatura/', views.assinatura_aluguel),

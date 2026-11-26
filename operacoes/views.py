@@ -52,7 +52,7 @@ class CobrancasAluguelView(generics.ListAPIView):
 
 
 class AlugueisView(generics.ListCreateAPIView):
-    queryset = Aluguel.objects.select_related('moto', 'cliente').prefetch_related('cobrancas').order_by('-inicio', '-id')
+    queryset = Aluguel.objects.select_related('moto', 'cliente', 'caucao_recebimento', 'caucao_devolucao').prefetch_related('cobrancas').order_by('-inicio', '-id')
     serializer_class = AluguelSerializer
 
 
@@ -184,6 +184,8 @@ def financeiro(request):
 @transaction.atomic
 def atualizar_caucao(request, pk):
     aluguel = get_object_or_404(Aluguel.objects.select_for_update(), pk=pk)
+    if aluguel.caucao_recebimento_id:
+        raise serializers.ValidationError('A caução já foi recebida e seu valor não pode ser alterado.')
     if aluguel.assinatura_status in ('pendente', 'assinado'):
         raise serializers.ValidationError('Não é possível mudar a caução de um contrato já enviado para assinatura.')
     class CaucaoSerializer(serializers.Serializer):
@@ -193,3 +195,35 @@ def atualizar_caucao(request, pk):
     aluguel.valor_caucao = serializer.validated_data['valor_caucao']
     aluguel.save(update_fields=['valor_caucao'])
     return Response(AluguelSerializer(aluguel).data)
+
+
+@api_view(['POST'])
+@transaction.atomic
+def movimentar_caucao(request, pk, acao):
+    aluguel = get_object_or_404(Aluguel.objects.select_for_update(), pk=pk)
+    class DataSerializer(serializers.Serializer):
+        data = serializers.DateField()
+    serializer = DataSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data['data']
+    if data > timezone.localdate():
+        raise serializers.ValidationError({'data': 'A movimentação não pode estar no futuro.'})
+    if acao == 'receber':
+        if aluguel.caucao_recebimento_id:
+            raise serializers.ValidationError('Esta caução já foi recebida.')
+        if not aluguel.valor_caucao or aluguel.valor_caucao <= 0:
+            raise serializers.ValidationError('Informe uma caução maior que zero antes de receber.')
+        campo, tipo, descricao, valor = 'caucao_recebimento', 'entrada', 'Recebimento de caução', aluguel.valor_caucao
+    else:
+        if not aluguel.caucao_recebimento_id:
+            raise serializers.ValidationError('Registre o recebimento antes da devolução.')
+        if aluguel.caucao_devolucao_id:
+            raise serializers.ValidationError('Esta caução já foi devolvida.')
+        recebido = aluguel.caucao_recebimento
+        if data < recebido.data:
+            raise serializers.ValidationError({'data': 'A devolução não pode ocorrer antes do recebimento.'})
+        campo, tipo, descricao, valor = 'caucao_devolucao', 'saida', 'Devolução de caução', recebido.valor
+    movimento = Movimento.objects.create(descricao=f'{descricao} · aluguel #{aluguel.pk} · {aluguel.moto.placa}', categoria='motos', tipo=tipo, valor=valor, data=data, moto=aluguel.moto)
+    setattr(aluguel, campo, movimento)
+    aluguel.save(update_fields=[campo])
+    return Response(AluguelSerializer(aluguel).data, status=201)
