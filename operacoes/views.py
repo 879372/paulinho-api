@@ -71,7 +71,7 @@ class MovimentosView(generics.ListCreateAPIView):
     serializer_class = MovimentoSerializer
 
     def get_queryset(self):
-        qs = Movimento.objects.select_related('moto', 'lote')
+        qs = Movimento.objects.select_related('moto', 'lote', 'aluguel_caucao_recebida', 'aluguel_caucao_devolvida')
         for campo in ('moto', 'lote'):
             if value := self.request.query_params.get(campo):
                 if not value.isdigit():
@@ -233,3 +233,48 @@ def movimentar_caucao(request, pk, acao):
     setattr(aluguel, campo, movimento)
     aluguel.save(update_fields=[campo])
     return Response(AluguelSerializer(aluguel).data, status=201)
+
+
+@api_view(['PATCH', 'DELETE'])
+@transaction.atomic
+def movimento_criacao(request, pk, somente_criacao=True):
+    qs = Movimento.objects.all()
+    if somente_criacao:
+        qs = qs.filter(lote__isnull=False, moto__isnull=True)
+    inicial = get_object_or_404(qs, pk=pk)
+    lote = LoteAnimal.objects.select_for_update().get(pk=inicial.lote_id) if inicial.lote_id else None
+    movimento = get_object_or_404(Movimento.objects.select_for_update(), pk=pk)
+    if movimento.cobranca_id or movimento.categoria == 'aluguel' or Aluguel.objects.filter(Q(caucao_recebimento_id=pk) | Q(caucao_devolucao_id=pk)).exists():
+        raise serializers.ValidationError('Este lançamento está vinculado a uma cobrança ou caução e deve ser tratado no aluguel de origem.')
+    compra = movimento.categoria == 'compra_animais'
+    if compra and lote.movimentos.filter(categoria='compra_animais').count() != 1:
+        raise serializers.ValidationError('Revise os lançamentos de compra duplicados antes de alterar este registro.')
+    if request.method == 'DELETE':
+        if compra:
+            lote.valor_compra = Decimal('0')
+            lote.save(update_fields=['valor_compra'])
+        movimento.delete()
+        return Response(status=204)
+    permitidos = {'descricao', 'valor', 'data'} if compra else {'descricao', 'valor', 'data', 'categoria'}
+    if set(request.data) - permitidos:
+        raise serializers.ValidationError('Altere somente os dados deste lançamento; o lote e o tipo não podem ser trocados.')
+    if compra:
+        class CompraSerializer(serializers.Serializer):
+            descricao = serializers.CharField(max_length=255, required=False)
+            valor = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'), required=False)
+            data = serializers.DateField(required=False)
+        serializer = CompraSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dados = serializer.validated_data
+        if dados.get('data', movimento.data) > timezone.localdate():
+            raise serializers.ValidationError({'data': 'A compra não pode estar no futuro.'})
+        for campo, valor in dados.items():
+            setattr(movimento, campo, valor)
+        movimento.save()
+        lote.valor_compra, lote.data_aquisicao = movimento.valor, movimento.data
+        lote.save(update_fields=['valor_compra', 'data_aquisicao'])
+    else:
+        serializer = MovimentoSerializer(movimento, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+    return Response(MovimentoSerializer(movimento).data)

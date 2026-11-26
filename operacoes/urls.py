@@ -22,6 +22,8 @@ urlpatterns = [
     path('alugueis/cobrancas/<int:pk>/receber/', views.receber_aluguel),
     path('animais/<int:pk>/', views.LoteDetailView.as_view()),
     path('animais/', views.LotesView.as_view()),
+    path('animais/movimentos/<int:pk>/', views.movimento_criacao),
+    path('movimentos/<int:pk>/', views.movimento_criacao, {'somente_criacao': False}),
     path('movimentos/', views.MovimentosView.as_view()),
     path('financeiro/', views.financeiro),
 ]

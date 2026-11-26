@@ -140,6 +140,10 @@ class LoteSerializer(serializers.ModelSerializer):
 
 
 class MovimentoSerializer(serializers.ModelSerializer):
+    editavel = serializers.SerializerMethodField()
+
+    def get_editavel(self, obj):
+        return not (obj.cobranca_id or obj.categoria == 'aluguel' or hasattr(obj, 'aluguel_caucao_recebida') or hasattr(obj, 'aluguel_caucao_devolvida'))
     referencia = serializers.SerializerMethodField()
 
     class Meta:
@@ -151,6 +155,8 @@ class MovimentoSerializer(serializers.ModelSerializer):
         return obj.lote.identificacao if obj.lote_id else obj.moto.placa if obj.moto_id else 'Geral'
 
     def validate(self, attrs):
+        if self.instance:
+            attrs = {**{campo: getattr(self.instance, campo) for campo in ('data', 'categoria', 'tipo', 'moto', 'lote')}, **attrs}
         if attrs.get('moto') and attrs.get('lote'):
             raise serializers.ValidationError('Vincule o lançamento a uma moto ou a um lote.')
         if attrs['data'] > date.today():
