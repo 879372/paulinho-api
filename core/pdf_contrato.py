@@ -133,6 +133,8 @@ def valor_completo(valor):
 def qualificacao_empresa(papel):
     nome = settings.COMPANY_LEGAL_NAME or settings.COMPANY_NAME
     doc = f'inscrita no CNPJ sob o nº {t(settings.COMPANY_CNPJ)}' if settings.COMPANY_CNPJ else f'inscrito(a) no CPF/CNPJ sob o nº {LACUNA}'
+    if not settings.COMPANY_CNPJ and settings.COMPANY_CPF:
+        doc = f'inscrito(a) no CPF sob o nº {t(settings.COMPANY_CPF)}'
     endereco = f'com endereço em {t(settings.COMPANY_ADDRESS)}' if settings.COMPANY_ADDRESS else f'com endereço em {LACUNA}{LACUNA}'
     telefone = f', telefone {t(settings.COMPANY_PHONE)}' if settings.COMPANY_PHONE else ''
     return f'<b>{papel}:</b> <b>{t(nome)}</b>, {doc}, {endereco}{telefone}, doravante denominado(a) simplesmente <b>{papel}</b>.'

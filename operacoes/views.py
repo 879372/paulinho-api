@@ -9,7 +9,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from core.models import Contrato, Parcela
 from .models import Moto, Aluguel, CobrancaAluguel, LoteAnimal, Movimento
-from core.assinatura import view_assinatura, view_pdf_assinado
+from core.assinatura import resumo, view_assinatura, view_pdf_assinado
+from types import SimpleNamespace
+from .cadastro import resumo_cadastro
 from .contrato_pdf import contrato_locacao_bytes, contrato_locacao_pdf
 from .serializers import MotoSerializer, AluguelSerializer, CobrancaSerializer, LoteSerializer, MovimentoSerializer
 
@@ -102,9 +104,23 @@ def contrato_aluguel(request, pk):
 
 
 @api_view(['GET', 'POST'])
+@transaction.atomic
 def assinatura_aluguel(request, pk):
-    aluguel = get_object_or_404(Aluguel.objects.select_related('moto', 'cliente').prefetch_related('cobrancas'), pk=pk)
-    return view_assinatura(request, aluguel, lambda: contrato_locacao_bytes(aluguel), f'Locação {aluguel.moto.placa} nº {aluguel.pk:05d} – {aluguel.cliente.nome}', f'contrato-locacao-{aluguel.moto.placa}-{aluguel.pk}.pdf', aluguel.cliente)
+    qs = Aluguel.objects.select_related('moto', 'cliente').prefetch_related('cobrancas')
+    if request.method == 'POST':
+        qs = qs.select_for_update(of=('self',))
+    aluguel = get_object_or_404(qs, pk=pk)
+    cadastro = resumo_cadastro(aluguel)
+    if request.method == 'POST' and not cadastro['cadastro_completo']:
+        return Response({'detail': 'O locatário precisa preencher todos os dados do formulário antes da assinatura.', **cadastro}, status=400)
+    if request.method == 'GET' and not aluguel.assinatura_id:
+        return Response({**resumo(aluguel), **cadastro})
+    nome = aluguel.dados_locatario.get('nome') or aluguel.cliente.nome
+    signatario = SimpleNamespace(nome=nome, telefone=aluguel.cliente.telefone)
+    resposta = view_assinatura(request, aluguel, lambda: contrato_locacao_bytes(aluguel), f'Locação {aluguel.moto.placa} nº {aluguel.pk:05d} – {nome}', f'contrato-locacao-{aluguel.moto.placa}-{aluguel.pk}.pdf', signatario)
+    if isinstance(resposta.data, dict):
+        resposta.data.update(cadastro)
+    return resposta
 
 
 @api_view(['GET'])

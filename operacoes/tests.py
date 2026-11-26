@@ -147,6 +147,11 @@ class AssinaturaAutentiqueTests(TestCase):
         moto = Moto.objects.create(placa='TST1A23', modelo='CG 160')
         self.contrato = Aluguel.objects.create(moto=moto, cliente=self.cliente, inicio=hoje, fim=hoje+timedelta(days=30), valor=Decimal('250'), periodicidade='semanal', primeiro_vencimento=hoje)
         CobrancaAluguel.objects.create(aluguel=self.contrato, vencimento=hoje, valor=Decimal('250'))
+        from .test_cadastro import dados_validos
+        from django.utils import timezone
+        self.contrato.dados_locatario = dados_validos()
+        self.contrato.cadastro_preenchido_em = timezone.now()
+        self.contrato.save(update_fields=['dados_locatario', 'cadastro_preenchido_em'])
         self.url = f'/api/operacoes/alugueis/{self.contrato.pk}/assinatura/'
 
 

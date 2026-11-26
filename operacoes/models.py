@@ -23,6 +23,10 @@ class Aluguel(AssinaturaDigital):
     valor_caucao = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal('0'))])
     periodicidade = models.CharField(max_length=8, choices=[('semanal', 'Semanal'), ('mensal', 'Mensal')])
     primeiro_vencimento = models.DateField()
+    cadastro_token_hash = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    cadastro_expira_em = models.DateTimeField(null=True, blank=True)
+    cadastro_preenchido_em = models.DateTimeField(null=True, blank=True)
+    dados_locatario = models.JSONField(default=dict, blank=True)
     observacoes = models.TextField(blank=True)
 
 

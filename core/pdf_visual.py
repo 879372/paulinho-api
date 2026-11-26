@@ -51,7 +51,7 @@ def brand():
 
 def header(title, reference):
     company = [p(settings.COMPANY_NAME, 'brand')]
-    for value in [settings.COMPANY_LEGAL_NAME, f'CNPJ {settings.COMPANY_CNPJ}' if settings.COMPANY_CNPJ else '', settings.COMPANY_ADDRESS, settings.COMPANY_PHONE]:
+    for value in [settings.COMPANY_LEGAL_NAME, f'CNPJ {settings.COMPANY_CNPJ}' if settings.COMPANY_CNPJ else f'CPF {settings.COMPANY_CPF}' if settings.COMPANY_CPF else '', settings.COMPANY_ADDRESS, settings.COMPANY_PHONE]:
         if value:
             company.append(p(value, 'small'))
     row = Table([[brand(), company]], colWidths=[48, WIDTH-48], hAlign='LEFT')

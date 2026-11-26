@@ -2,8 +2,12 @@ from django.urls import path
 from core.vencimentos import vencimento_aluguel
 from core.adiamento import adiar_aluguel
 from . import views
+from .cadastro import gerenciar_cadastro, consultar_publico, concluir_publico
 
 urlpatterns = [
+    path('cadastro-publico/consultar/', consultar_publico),
+    path('cadastro-publico/concluir/', concluir_publico),
+    path('alugueis/<int:pk>/cadastro/', gerenciar_cadastro),
     path('alugueis/cobrancas/<int:pk>/vencimento/', vencimento_aluguel),
     path('alugueis/cobrancas/<int:pk>/adiar/', adiar_aluguel),
     path('motos/', views.MotosView.as_view()),

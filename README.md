@@ -67,3 +67,12 @@ O cron usa `sh start_lembretes.sh`, aguardando as migrações do web antes de ex
 `valor_caucao` registra a garantia combinada, com valor mínimo zero. Não gera mensalidade, cobrança ou entrada automática no caixa. No formulário Novo aluguel, use 0 quando não houver caução. Cadastros anteriores preservam o valor como não informado até que seja preenchido.
 
 A lista dos aluguéis oferece Informar/Editar caução, por `PATCH /api/operacoes/alugueis/<id>/caucao/`. Contratos já enviados ou assinados não permitem alterar o valor, preservando o documento enviado. O contrato PDF exibe o valor por extenso; zero informa que não há caução, e valor não informado mantém o campo em branco.
+
+
+## Cadastro do locatário antes da assinatura
+
+No painel de assinatura do aluguel, gere e compartilhe o link do cadastro. O cliente preenche sem login seus dados pessoais, endereço e CNH com categoria A. O link dura sete dias, permite uma conclusão e não revela os dados já enviados. Gerar outro link revoga o anterior; reabrir exige preencher novamente e bloqueia a assinatura. Contratos pendentes ou assinados não permitem reabertura.
+
+O token fica no fragmento do link, é enviado à API no corpo e só seu hash é salvo. O cadastro pertence ao aluguel, sem alterar o cadastro geral do cliente. Enviar à Autentique é uma ação separada, habilitada somente após validação completa. O envio usa o WhatsApp cadastrado pelo operador.
+
+O contrato não cobra multa nem juros de mora. Despesas de uso e manutenção preventiva durante a locação ficam com o locatário; defeitos anteriores permanecem com o locador. Para a qualificação fixa do locador, configure COMPANY_LEGAL_NAME, COMPANY_CNPJ ou COMPANY_CPF, COMPANY_ADDRESS e COMPANY_PHONE; AUTENTIQUE_EMAIL_EMPRESA define o e-mail do signatário da empresa.

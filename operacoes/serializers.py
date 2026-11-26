@@ -3,6 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 from core.api.contratos.services import adicionar_periodo
+from .cadastro import cadastro_completo
 from .models import Moto, Aluguel, CobrancaAluguel, LoteAnimal, Movimento
 
 
@@ -52,14 +53,19 @@ class CobrancaSerializer(serializers.ModelSerializer):
 
 
 class AluguelSerializer(serializers.ModelSerializer):
+    cadastro_completo = serializers.SerializerMethodField()
+
+    def get_cadastro_completo(self, obj):
+        return cadastro_completo(obj)
+
     cliente_nome = serializers.CharField(source='cliente.nome', read_only=True)
     placa = serializers.CharField(source='moto.placa', read_only=True)
     cobrancas = CobrancaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Aluguel
-        exclude = ['assinatura_id']
-        read_only_fields = ['assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox']
+        exclude = ['assinatura_id', 'cadastro_token_hash', 'dados_locatario']
+        read_only_fields = ['assinatura_status', 'assinatura_enviada_em', 'assinatura_concluida_em', 'assinatura_link_empresa', 'assinatura_sandbox', 'cadastro_expira_em', 'cadastro_preenchido_em']
 
     def validate(self, attrs):
         if attrs['fim'] < attrs['inicio']:
