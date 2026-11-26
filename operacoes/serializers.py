@@ -119,6 +119,26 @@ class LoteSerializer(serializers.ModelSerializer):
         return lote
 
 
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        instance = LoteAnimal.objects.select_for_update().get(pk=instance.pk)
+        compras = list(instance.movimentos.filter(categoria='compra_animais').order_by('pk'))
+        alterou_compra = any(campo in validated_data and validated_data[campo] != getattr(instance, campo) for campo in ('valor_compra', 'data_aquisicao', 'identificacao'))
+        if alterou_compra and len(compras) > 1:
+            raise serializers.ValidationError('Há mais de um lançamento de compra neste lote. Revise os lançamentos antes de alterar os dados da compra.')
+        lote = super().update(instance, validated_data)
+        if alterou_compra:
+            if compras:
+                compra = compras[0]
+                compra.descricao = f'Compra: {lote.identificacao}'
+                compra.valor = lote.valor_compra
+                compra.data = lote.data_aquisicao
+                compra.save(update_fields=['descricao', 'valor', 'data'])
+            elif lote.valor_compra:
+                Movimento.objects.create(descricao=f'Compra: {lote.identificacao}', categoria='compra_animais', tipo='saida', valor=lote.valor_compra, data=lote.data_aquisicao, lote=lote)
+        return lote
+
+
 class MovimentoSerializer(serializers.ModelSerializer):
     referencia = serializers.SerializerMethodField()
 

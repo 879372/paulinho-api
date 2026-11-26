@@ -61,6 +61,12 @@ class LotesView(generics.ListCreateAPIView):
     serializer_class = LoteSerializer
 
 
+class LoteDetailView(generics.RetrieveUpdateAPIView):
+    queryset = LoteAnimal.objects.all()
+    serializer_class = LoteSerializer
+    http_method_names = ['get', 'patch', 'head', 'options']
+
+
 class MovimentosView(generics.ListCreateAPIView):
     serializer_class = MovimentoSerializer
 
